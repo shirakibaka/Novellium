@@ -1,0 +1,22 @@
+<Project Sdk="Cosmos.Sdk/3.0.88">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <CosmosDefaultFont>Novellium.Fonts.zap-vga16.psf</CosmosDefaultFont>
+
+    <CosmosEnableScheduler>true</CosmosEnableScheduler>
+    <NoWarn>$(NoWarn);COSMOS0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cosmos.Kernel" Version="3.0.88" />
+    <PackageReference Include="Cosmos.Kernel.System" Version="3.0.88" />
+    <PackageReference Include="Cosmos.Kernel.Core" Version="3.0.88" />
+
+    <EmbeddedResource Include="Fonts/zap-vga16.psf"
+                      LogicalName="Novellium.Fonts.zap-vga16.psf" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,119 @@
+// Output.cs — Thread-safe console I/O and formatted diagnostic logging
+using System;
+using Novellium.Services;
+
+namespace Novellium.IO;
+
+public static class Output
+{
+    private static readonly object Lock = new();
+
+    public static void Write(string text)
+    {
+        lock (Lock) Console.Write(text);
+    }
+
+    public static void WriteLine(string text)
+    {
+        lock (Lock) Console.WriteLine(text);
+    }
+
+    public static void WriteLine()
+    {
+        lock (Lock) Console.WriteLine();
+    }
+
+    public static void Write(string text, ConsoleColor color)
+    {
+        lock (Lock)
+        {
+            ConsoleColor prev = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            Console.Write(text);
+            Console.ForegroundColor = prev;
+        }
+    }
+
+    public static void WriteLine(string text, ConsoleColor color)
+    {
+        lock (Lock)
+        {
+            ConsoleColor prev = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            Console.WriteLine(text);
+            Console.ForegroundColor = prev;
+        }
+    }
+
+    public static void ResetColor()
+    {
+        lock (Lock) Console.ResetColor();
+    }
+
+    public static void Clear()
+    {
+        lock (Lock) Console.Clear();
+    }
+
+    public static void WriteTag(string tag, ConsoleColor tagColor, string text, ConsoleColor? textColor = null)
+    {
+        lock (Lock)
+        {
+            ConsoleColor prev = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("[");
+            Console.ForegroundColor = tagColor;
+            Console.Write(tag);
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.Write("] ");
+            if (textColor.HasValue) Console.ForegroundColor = textColor.Value;
+            Console.WriteLine(text);
+            Console.ForegroundColor = prev;
+        }
+    }
+
+    public static void WriteTaggedLine(string tag, ConsoleColor tagColor, string text, ConsoleColor? textColor = null)
+        => WriteTag(tag, tagColor, text, textColor);
+}
+
+public static class OutputInfo
+{
+    public static void Ok(string text)
+    {
+        Output.WriteTag("OK", ConsoleColor.Green, text);
+        Syslogd.Log(LogLevel.Ok, "system", text);
+    }
+
+    public static void Error(string text)
+    {
+        Output.WriteTag("ERROR", ConsoleColor.Red, text);
+        Syslogd.Log(LogLevel.Error, "system", text);
+    }
+
+    public static void Warning(string text)
+    {
+        Output.WriteTag("WARNING", ConsoleColor.Yellow, text);
+        Syslogd.Log(LogLevel.Warning, "system", text);
+    }
+
+    public static void Info(string text)
+    {
+        Output.WriteTag("INFO", ConsoleColor.Cyan, text);
+        Syslogd.Log(LogLevel.Info, "system", text);
+    }
+
+    public static void Debug(string text)
+    {
+        Output.WriteTag("DEBUG", ConsoleColor.Magenta, text);
+        Syslogd.Log(LogLevel.Debug, "system", text);
+    }
+
+    public static void Custom(string title, string text, ConsoleColor titleColor, ConsoleColor textColor)
+        => Output.WriteTag(title, titleColor, text, textColor);
+
+    public static void Test(bool passed, string text)
+        => Output.WriteTag(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red, text);
+
+    public static void TestWarning(string text)
+        => Output.WriteTag("WARN", ConsoleColor.Yellow, text);
+}

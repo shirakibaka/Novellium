@@ -1,0 +1,27 @@
+# Build outputs
+bin/
+obj/
+output-x64/
+*.iso
+*.elf
+*.bin
+
+# Disk & Storage Images
+512
+*.img
+*.vmdk
+*.vdi
+*.qcow2
+
+# Cosmos intermediate & caches
+.cosmos/
+*.log
+
+# IDE & User-specific files
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
