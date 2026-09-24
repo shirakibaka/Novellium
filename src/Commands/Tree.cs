@@ -107,14 +107,14 @@ public static class Tree
             bool isLast = (i == list.Count - 1);
             Node node = list[i];
 
-            string connector = isLast ? "└── " : "├── ";
+            string connector = isLast ? "`-- " : "|-- ";
             Output.Write(indent + connector, ConsoleColor.Gray);
             Output.WriteLine(node.Name, node.Stat.IsDirectory ? ConsoleColor.Cyan : ConsoleColor.White);
 
             if (node.Stat.IsDirectory)
             {
                 dirCount++;
-                string nextIndent = indent + (isLast ? "    " : "│   ");
+                string nextIndent = indent + (isLast ? "    " : "|   ");
                 PrintTree(node.Path, nextIndent, currentLevel + 1, maxLevel, dirsOnly, ref dirCount, ref fileCount);
             }
             else
