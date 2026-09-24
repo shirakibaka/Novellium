@@ -46,7 +46,27 @@ public static class Syslogd
     public const string LogFilePath = "/var/log/syslog";
     private const int MaxRing = 200;
 
-    public static bool PauseDiskFlushing { get; set; } = false;
+    private static bool _pauseDiskFlushing = false;
+    private static readonly object FlushLock = new();
+
+    public static bool PauseDiskFlushing
+    {
+        get
+        {
+            lock (Lock) return _pauseDiskFlushing;
+        }
+        set
+        {
+            lock (Lock)
+            {
+                _pauseDiskFlushing = value;
+            }
+            if (value)
+            {
+                lock (FlushLock) { }
+            }
+        }
+    }
 
     private static readonly object Lock = new();
     private static readonly Queue<LogEntry> Queue = new();
@@ -111,6 +131,16 @@ public static class Syslogd
 
     private static void EnsureLogFile()
     {
+        if (PauseDiskFlushing) return;
+        lock (FlushLock)
+        {
+            if (PauseDiskFlushing) return;
+            EnsureLogFileInternal();
+        }
+    }
+
+    private static void EnsureLogFileInternal()
+    {
         try
         {
             if (!VfsManager.TryStat(LogFilePath, out _))
@@ -130,40 +160,45 @@ public static class Syslogd
     {
         if (PauseDiskFlushing) return;
 
-        List<LogEntry> entries;
-        lock (Lock)
+        lock (FlushLock)
         {
-            if (Queue.Count == 0) return;
-            entries = new(Queue.Count);
-            while (Queue.Count > 0) entries.Add(Queue.Dequeue());
-        }
+            if (PauseDiskFlushing) return;
 
-        if (entries.Count == 0) return;
-
-        try
-        {
-            EnsureLogFile();
-            if (VfsManager.TryOpenFile(LogFilePath, out var handle) && handle != null)
+            List<LogEntry> entries;
+            lock (Lock)
             {
-                using (handle)
+                if (Queue.Count == 0) return;
+                entries = new(Queue.Count);
+                while (Queue.Count > 0) entries.Add(Queue.Dequeue());
+            }
+
+            if (entries.Count == 0) return;
+
+            try
+            {
+                EnsureLogFileInternal();
+                if (VfsManager.TryOpenFile(LogFilePath, out var handle) && handle != null)
                 {
-                    handle.TrySeek(0, SeekWhence.End);
-                    var sb = new StringBuilder();
-                    foreach (var e in entries) sb.AppendLine(e.ToString());
-                    byte[] bytes = Encoding.UTF8.GetBytes(sb.ToString());
-                    handle.Write(bytes);
-                    handle.TryFlush();
+                    using (handle)
+                    {
+                        handle.TrySeek(0, SeekWhence.End);
+                        var sb = new StringBuilder();
+                        foreach (var e in entries) sb.AppendLine(e.ToString());
+                        byte[] bytes = Encoding.UTF8.GetBytes(sb.ToString());
+                        handle.Write(bytes);
+                        handle.TryFlush();
+                    }
+                }
+                else
+                {
+                    lock (Lock)
+                    {
+                        for (int i = entries.Count - 1; i >= 0; i--)
+                            if (Queue.Count < 500) Queue.Enqueue(entries[i]);
+                    }
                 }
             }
-            else
-            {
-                lock (Lock)
-                {
-                    for (int i = entries.Count - 1; i >= 0; i--)
-                        if (Queue.Count < 500) Queue.Enqueue(entries[i]);
-                }
-            }
+            catch { }
         }
-        catch { }
     }
 }

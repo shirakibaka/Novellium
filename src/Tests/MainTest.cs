@@ -103,17 +103,32 @@ public static class MainTest
 
     private static TestBlock RunBlock(string title, Func<TestBlock> func)
     {
+        string runText = $"Running suite: {title}...";
         Output.WriteDirect("  [", ConsoleColor.White);
         Output.WriteDirect("+", ConsoleColor.Yellow);
         Output.WriteDirect("] ", ConsoleColor.White);
-        Output.WriteDirectLine($"Running suite: {title}...", ConsoleColor.Gray);
+        Output.WriteDirect(runText, ConsoleColor.Gray);
 
-        TestBlock b = func();
+        TestBlock b;
+        try
+        {
+            b = func();
+        }
+        catch (Exception ex)
+        {
+            b = CurBlock ?? new TestBlock(title);
+            Failed++;
+            FailedTests.Add($"{title}: {ex.Message}");
+            b.Items.Add((false, $"Suite exception: {ex.Message}"));
+        }
 
-        Output.WriteDirect("  [", ConsoleColor.White);
+        string compText = $"Completed suite: {b.Title} ({b.Items.Count} tests)";
+        int pad = Math.Max(0, runText.Length - compText.Length);
+
+        Output.WriteDirect("\r  [", ConsoleColor.White);
         Output.WriteDirect("v", ConsoleColor.Green);
         Output.WriteDirect("] ", ConsoleColor.White);
-        Output.WriteDirectLine($"Completed suite: {b.Title} ({b.Items.Count} tests)", ConsoleColor.White);
+        Output.WriteDirectLine(compText + new string(' ', pad), ConsoleColor.White);
 
         return b;
     }
@@ -132,41 +147,41 @@ public static class MainTest
         string leftHdr = PadOrTruncate($"--- {left.Title} ---", width);
         string rightHdr = right != null ? PadOrTruncate($"--- {right.Title} ---", width) : "";
 
-        Output.Write(leftHdr, ConsoleColor.Yellow);
-        Output.Write("   ");
-        Output.WriteLine(rightHdr, ConsoleColor.Yellow);
+        Output.WriteDirect(leftHdr, ConsoleColor.White);
+        Output.WriteDirect("   ");
+        Output.WriteDirectLine(rightHdr, ConsoleColor.White);
 
         for (int i = 0; i < maxItems; i++)
         {
             if (i < left.Items.Count)
             {
                 var (passed, name) = left.Items[i];
-                Output.Write("[", ConsoleColor.White);
-                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
-                Output.Write("] ", ConsoleColor.White);
-                Output.Write(PadOrTruncate(name, width - 7));
+                Output.WriteDirect("[", ConsoleColor.White);
+                Output.WriteDirect(passed ? "v" : "x", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.WriteDirect("] ", ConsoleColor.White);
+                Output.WriteDirect(PadOrTruncate(name, width - 4), ConsoleColor.White);
             }
             else
             {
-                Output.Write(new string(' ', width));
+                Output.WriteDirect(new string(' ', width));
             }
 
-            Output.Write("   ");
+            Output.WriteDirect("   ");
 
             if (right != null && i < right.Items.Count)
             {
                 var (passed, name) = right.Items[i];
-                Output.Write("[", ConsoleColor.White);
-                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
-                Output.Write("] ", ConsoleColor.White);
-                Output.WriteLine(PadOrTruncate(name, width - 7));
+                Output.WriteDirect("[", ConsoleColor.White);
+                Output.WriteDirect(passed ? "v" : "x", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.WriteDirect("] ", ConsoleColor.White);
+                Output.WriteDirectLine(PadOrTruncate(name, width - 4), ConsoleColor.White);
             }
             else
             {
-                Output.WriteLine();
+                Output.WriteDirectLine();
             }
         }
-        Output.WriteLine();
+        Output.WriteDirectLine();
     }
 
     private static TestBlock TestKernelAndSubsystems()
