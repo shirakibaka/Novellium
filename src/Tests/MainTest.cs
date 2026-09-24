@@ -75,6 +75,7 @@ public static class MainTest
             blocks.Add(RunBlock("Unix Utilities & Redirection", TestUnixCoreutilsAndRedirection));
             blocks.Add(RunBlock("find & tree Commands", TestFindAndTreeCommands));
             blocks.Add(RunBlock("cp & mv Commands", TestCpAndMvCommands));
+            blocks.Add(RunBlock("Clock Cache Engine", TestClockCache));
         }
         finally
         {
@@ -583,6 +584,61 @@ public static class MainTest
         Check(Exec($"mv {backupDir} {movedDir}") == 0 && !Directory.Exists(backupDir) && Directory.Exists(movedDir), "mv directory move");
 
         Directory.Delete(cDir, true);
+        return block;
+    }
+
+    private static TestBlock TestClockCache()
+    {
+        TestBlock block = new("Clock Cache Engine");
+        CurBlock = block;
+
+        // 1. Basic fill, hit & miss check
+        ClockCache cache = new(4);
+        byte[] dummy = new byte[] { 1, 2, 3 };
+
+        cache.Put(10, dummy);
+        cache.Put(20, dummy);
+        cache.Put(30, dummy);
+        cache.Put(40, dummy);
+
+        Check(cache.Count == 4 && cache.ContainsKey(10) && cache.ContainsKey(40), "ClockCache initial 4-item fill");
+        Check(cache.TryGet(10, out var d1) && d1 != null && cache.TryGet(20, out _) && cache.Hits == 2, "ClockCache hit verification & counter");
+
+        // 2. Second Chance Bit & Eviction
+        cache.Put(50, dummy);
+        Check(!cache.ContainsKey(30) && cache.ContainsKey(50) && cache.Evictions == 1, "ClockCache eviction of unreferenced slot");
+
+        // 3. Sequential Scan Workload Simulation (32 keys on capacity 8)
+        ClockCache scanCache = new(8);
+        for (ulong i = 1; i <= 32; i++)
+        {
+            if (!scanCache.TryGet(i, out _))
+            {
+                scanCache.Put(i, dummy);
+            }
+        }
+        Check(scanCache.Misses == 32 && scanCache.Hits == 0 && scanCache.Evictions == 24, "ClockCache sequential scan workload (0% hits)");
+
+        // 4. Hotspot / Zipfian Workload Simulation (80% requests hit hot keys 1..3, 20% hit 4..20)
+        ClockCache hotCache = new(8);
+        for (ulong i = 1; i <= 8; i++) hotCache.Put(i, dummy);
+        hotCache.ResetStats();
+
+        Random rnd = new(42);
+        for (int req = 0; req < 100; req++)
+        {
+            ulong key = (rnd.Next(100) < 80) ? (ulong)rnd.Next(1, 4) : (ulong)rnd.Next(4, 21);
+            if (!hotCache.TryGet(key, out _))
+            {
+                hotCache.Put(key, dummy);
+            }
+        }
+        Check(hotCache.HitRatio >= 70.0, "ClockCache hotspot workload high hit ratio");
+
+        // 5. Clear & ResetState
+        hotCache.Clear();
+        Check(hotCache.Count == 0 && !hotCache.ContainsKey(1), "ClockCache Clear resets capacity and items");
+
         return block;
     }
 
