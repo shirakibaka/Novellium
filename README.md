@@ -39,6 +39,16 @@ All commands are implemented in `src/Commands/` and support `-h` / `--help`:
 | `help` | Command reference | `[command]` |
 | `test` | Automated test suites | `[all\|process\|command\|system\|ext2\|output]` |
 
+## Pre-built Images & Testing
+
+For immediate testing without building from source:
+- **Bootable ISO:** [`dist/Novellium.iso`](file:///home/maidochka/Code/cosmos/Novellium/dist/Novellium.iso) (8.9 MiB).
+- **Storage Disk Image:** [`disk.img`](file:///home/maidochka/Code/cosmos/Novellium/disk.img) (512 MiB raw Ext2 disk formatted for AHCI SATA) located in the project root directory alongside `Kernel.cs`.
+  - When cloning from Git, unpack the compressed image:
+    ```bash
+    gzip -d -k disk.img.gz
+    ```
+
 ## Build & Run
 
 ### Prerequisites
@@ -53,6 +63,9 @@ PATH="$HOME/.dotnet/tools:$PATH" dotnet build
 Output ISO: `bin/Debug/net10.0/linux-x64/cosmos/Novellium.iso`
 
 ### Run (QEMU)
+
+Launch Novellium with the AHCI SATA storage controller, the 512 MiB disk image, and the bootable ISO:
+
 ```bash
 qemu-system-x86_64 \
     -enable-kvm \
@@ -61,6 +74,13 @@ qemu-system-x86_64 \
     -m 512M \
     -vga virtio \
     -display sdl,gl=on \
-    -cdrom bin/Debug/net10.0/linux-x64/cosmos/Novellium.iso
+    -device ahci,id=ahci \
+    -drive id=disk,file=disk.img,format=raw,if=none \
+    -device ide-hd,drive=disk,bus=ahci.0 \
+    -cdrom dist/Novellium.iso \
+    -boot d
 ```
-*(If SDL is unavailable, use `-display gtk` or omit `-display`).*
+
+> **Display Fallback:** If SDL or OpenGL is not installed on your host, use `-display gtk` or omit the `-display` option.
+>
+> **Self-Built ISO:** Replace `-cdrom dist/Novellium.iso` with `-cdrom bin/Debug/net10.0/linux-x64/cosmos/Novellium.iso`.

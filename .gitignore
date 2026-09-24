@@ -3,12 +3,14 @@ bin/
 obj/
 output-x64/
 *.iso
+!dist/*.iso
 *.elf
 *.bin
 
 # Disk & Storage Images
 512
 *.img
+!disk.img.gz
 *.vmdk
 *.vdi
 *.qcow2
