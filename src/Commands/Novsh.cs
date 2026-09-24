@@ -11,8 +11,6 @@ public static class Novsh
 {
     public static void Run(int pid, string[] args)
     {
-        Output.WriteLine($"[NOVSH] PID: {pid}");
-
         while (!PManager.IsKillReq(pid))
         {
             string? input = ReadLine(pid);
@@ -31,15 +29,13 @@ public static class Novsh
 
             PManager.Wait(pid, child, out _);
         }
-
-        Output.WriteLine("[NOVSH] terminated");
     }
 
     private static string? ReadLine(int pid)
     {
         JManager.Update(pid);
 
-        Output.Write("\nnovellium:", ConsoleColor.Cyan);
+        Output.Write("novellium:", ConsoleColor.Cyan);
         Output.Write(CManager.CurrentDirectory, ConsoleColor.White);
         Output.Write("$ ", ConsoleColor.Gray);
 

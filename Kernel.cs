@@ -16,8 +16,6 @@ public class Kernel : Sys.Kernel
         Init.Start();
         Init.ShowMotd();
 
-        // ComprehensiveCommandTests.Run();
-
         PManager.Start("novsh", [], Novsh.Run, 1);
     }
 
