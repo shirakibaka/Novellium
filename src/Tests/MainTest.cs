@@ -49,30 +49,34 @@ public static class MainTest
     public static void Run()
     {
         Passed = 0; Failed = 0; FailedTests.Clear();
-        Output.WriteDirectLine("=== NOVELLIUM UNIFIED MASTER INTEGRATION TEST SUITE ===", ConsoleColor.Magenta);
+        Output.WriteDirectLine("Running Novellium Test Suite...", ConsoleColor.Cyan);
 
         string oldCwd = CManager.CurrentDirectory;
         bool prevAutoReap = PManager.AutomaticOrphanReaping;
         PManager.AutomaticOrphanReaping = false;
 
+        bool prevPauseSyslog = Syslogd.PauseDiskFlushing;
+        Syslogd.PauseDiskFlushing = true;
+
         List<TestBlock> blocks = new();
         Output.StartCapture();
         try
         {
-            blocks.Add(RunBlock(TestKernelAndSubsystems));
-            blocks.Add(RunBlock(TestProcessLifecycle));
-            blocks.Add(RunBlock(TestPathNormalization));
-            blocks.Add(RunBlock(TestExt2Filesystem));
-            blocks.Add(RunBlock(TestE2EDeveloperWorkflow));
-            blocks.Add(RunBlock(TestCdAndPwdCommands));
-            blocks.Add(RunBlock(TestFileCommands));
-            blocks.Add(RunBlock(TestSystemInfoUtilities));
-            blocks.Add(RunBlock(TestUnixCoreutilsAndRedirection));
-            blocks.Add(RunBlock(TestFindAndTreeCommands));
+            blocks.Add(RunBlock("Kernel & Core Subsystems", TestKernelAndSubsystems));
+            blocks.Add(RunBlock("Process & Job Lifecycle", TestProcessLifecycle));
+            blocks.Add(RunBlock("Path Normalization & Resolution", TestPathNormalization));
+            blocks.Add(RunBlock("Ext2 Filesystem Engine", TestExt2Filesystem));
+            blocks.Add(RunBlock("End-To-End Developer Workflow", TestE2EDeveloperWorkflow));
+            blocks.Add(RunBlock("cd & pwd Utility Tests", TestCdAndPwdCommands));
+            blocks.Add(RunBlock("File & Directory Operations", TestFileCommands));
+            blocks.Add(RunBlock("System Info & Utilities", TestSystemInfoUtilities));
+            blocks.Add(RunBlock("Unix Utilities & Redirection", TestUnixCoreutilsAndRedirection));
+            blocks.Add(RunBlock("find & tree Commands", TestFindAndTreeCommands));
         }
         finally
         {
             Output.StopCapture();
+            Syslogd.PauseDiskFlushing = prevPauseSyslog;
             PManager.AutomaticOrphanReaping = prevAutoReap;
             CManager.CurrentDirectory = oldCwd;
         }
@@ -97,10 +101,20 @@ public static class MainTest
         Output.WriteDirectLine();
     }
 
-    private static TestBlock RunBlock(Func<TestBlock> func)
+    private static TestBlock RunBlock(string title, Func<TestBlock> func)
     {
+        Output.WriteDirect("  [", ConsoleColor.White);
+        Output.WriteDirect("+", ConsoleColor.Yellow);
+        Output.WriteDirect("] ", ConsoleColor.White);
+        Output.WriteDirectLine($"Running suite: {title}...", ConsoleColor.Gray);
+
         TestBlock b = func();
-        Output.WriteDirectLine($"  [+] Completed suite: {b.Title} ({b.Items.Count} tests)", ConsoleColor.Cyan);
+
+        Output.WriteDirect("  [", ConsoleColor.White);
+        Output.WriteDirect("v", ConsoleColor.Green);
+        Output.WriteDirect("] ", ConsoleColor.White);
+        Output.WriteDirectLine($"Completed suite: {b.Title} ({b.Items.Count} tests)", ConsoleColor.White);
+
         return b;
     }
 

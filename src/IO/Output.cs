@@ -43,6 +43,24 @@ public static class Output
         get { lock (Lock) return IsCapturing; }
     }
 
+    public static void WriteDirect(string text, ConsoleColor? color = null)
+    {
+        lock (Lock)
+        {
+            if (color.HasValue)
+            {
+                ConsoleColor prev = Console.ForegroundColor;
+                Console.ForegroundColor = color.Value;
+                Console.Write(text);
+                Console.ForegroundColor = prev;
+            }
+            else
+            {
+                Console.Write(text);
+            }
+        }
+    }
+
     public static void WriteDirectLine(string text = "", ConsoleColor? color = null)
     {
         lock (Lock)

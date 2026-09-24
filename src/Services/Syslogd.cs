@@ -46,6 +46,8 @@ public static class Syslogd
     public const string LogFilePath = "/var/log/syslog";
     private const int MaxRing = 200;
 
+    public static bool PauseDiskFlushing { get; set; } = false;
+
     private static readonly object Lock = new();
     private static readonly Queue<LogEntry> Queue = new();
     private static readonly List<LogEntry> Ring = new();
@@ -126,6 +128,8 @@ public static class Syslogd
 
     private static void FlushQueue()
     {
+        if (PauseDiskFlushing) return;
+
         List<LogEntry> entries;
         lock (Lock)
         {
