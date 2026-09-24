@@ -35,7 +35,7 @@ public static class Novsh
     {
         JManager.Update(pid);
 
-        Output.Write("novellium:", ConsoleColor.Cyan);
+        Output.Write("novellium:", ConsoleColor.DarkYellow);
         Output.Write(CManager.CurrentDirectory, ConsoleColor.White);
         Output.Write("$ ", ConsoleColor.Gray);
 

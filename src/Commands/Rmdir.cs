@@ -46,7 +46,21 @@ public static class Rmdir
                 continue;
             }
             if (!VfsManager.TryRemoveDirectory(path))
-                Output.WriteLine($"rmdir: failed to remove '{dir}': Directory not empty or busy", ConsoleColor.Red);
+            {
+                bool deleted = false;
+                try
+                {
+                    if (global::System.IO.Directory.Exists(path) && global::System.IO.Directory.GetFileSystemEntries(path).Length == 0)
+                    {
+                        global::System.IO.Directory.Delete(path);
+                        deleted = true;
+                    }
+                }
+                catch { }
+
+                if (!deleted)
+                    Output.WriteLine($"rmdir: failed to remove '{dir}': Directory not empty or busy", ConsoleColor.Red);
+            }
         }
     }
 

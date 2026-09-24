@@ -379,9 +379,9 @@ public static class MainTest
 
         Check(Exec("dmesg") == 0, "dmesg & syslog inspection");
 
+        Exec("cd /");
         Exec($"rm -f {ws}/Makefile {ws}/README.txt {ws}/src/main.c {ws}/src/utils.c {bgApp}");
         Exec($"rmdir {ws}/src {ws}/docs {ws}/build");
-        Exec("cd /");
         Exec($"rmdir {ws}");
         Check(!VfsManager.TryStat(ws, out _), "Cleanup workspace files & dirs");
 
