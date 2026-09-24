@@ -14,6 +14,18 @@ public static class ComprehensiveCommandTests
 {
     private static int Passed, Failed;
     private static readonly List<string> FailedTests = new();
+    private static TestBlock? CurBlock;
+
+    private class TestBlock
+    {
+        public string Title { get; }
+        public List<(bool Passed, string Name)> Items { get; } = new();
+
+        public TestBlock(string title)
+        {
+            Title = title;
+        }
+    }
 
     private static int Exec(string cmd)
     {
@@ -34,24 +46,25 @@ public static class ComprehensiveCommandTests
         Output.WriteDirectLine("=== COMPREHENSIVE COMMAND & FILESYSTEM TEST SUITE ===", ConsoleColor.Magenta);
 
         string oldCwd = CManager.CurrentDirectory;
+        List<TestBlock> blocks = new();
         Output.StartCapture();
         try
         {
-            TestPaths();
-            TestCdPwd();
-            TestTouch();
-            TestCat();
-            TestMkdir();
-            TestRm();
-            TestRmdir();
-            TestStat();
-            TestDf();
-            TestUname();
-            TestUptime();
-            TestFree();
-            TestLifecycle();
-            TestBg();
-            TestDmesg();
+            blocks.Add(TestPaths());
+            blocks.Add(TestCdPwd());
+            blocks.Add(TestTouch());
+            blocks.Add(TestCat());
+            blocks.Add(TestMkdir());
+            blocks.Add(TestRm());
+            blocks.Add(TestRmdir());
+            blocks.Add(TestStat());
+            blocks.Add(TestDf());
+            blocks.Add(TestUname());
+            blocks.Add(TestUptime());
+            blocks.Add(TestFree());
+            blocks.Add(TestLifecycle());
+            blocks.Add(TestBg());
+            blocks.Add(TestDmesg());
         }
         finally
         {
@@ -60,6 +73,13 @@ public static class ComprehensiveCommandTests
         }
 
         Output.WriteDirectLine();
+        for (int i = 0; i < blocks.Count; i += 2)
+        {
+            TestBlock left = blocks[i];
+            TestBlock? right = i + 1 < blocks.Count ? blocks[i + 1] : null;
+            PrintBlockPair(left, right);
+        }
+
         if (Failed == 0)
         {
             Output.WriteDirectLine($"COMPREHENSIVE SUITE RESULT: All {Passed} tests passed successfully!", ConsoleColor.Green);
@@ -72,9 +92,61 @@ public static class ComprehensiveCommandTests
         Output.WriteDirectLine();
     }
 
-    private static void TestPaths()
+    private static string PadOrTruncate(string str, int width)
     {
-        Output.WriteDirectLine("--- Path Normalization & Resolution Tests ---", ConsoleColor.Yellow);
+        if (str.Length > width) return str.Substring(0, width - 3) + "...";
+        return str.PadRight(width);
+    }
+
+    private static void PrintBlockPair(TestBlock left, TestBlock? right)
+    {
+        const int width = 38;
+        int maxItems = Math.Max(left.Items.Count, right?.Items.Count ?? 0);
+
+        string leftHdr = PadOrTruncate($"--- {left.Title} ---", width);
+        string rightHdr = right != null ? PadOrTruncate($"--- {right.Title} ---", width) : "";
+
+        Output.Write(leftHdr, ConsoleColor.Yellow);
+        Output.Write(" | ", ConsoleColor.DarkGray);
+        Output.WriteLine(rightHdr, ConsoleColor.Yellow);
+
+        for (int i = 0; i < maxItems; i++)
+        {
+            if (i < left.Items.Count)
+            {
+                var (passed, name) = left.Items[i];
+                Output.Write("[", ConsoleColor.White);
+                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.Write("] ", ConsoleColor.White);
+                Output.Write(PadOrTruncate(name, width - 7));
+            }
+            else
+            {
+                Output.Write(new string(' ', width));
+            }
+
+            Output.Write(" | ", ConsoleColor.DarkGray);
+
+            if (right != null && i < right.Items.Count)
+            {
+                var (passed, name) = right.Items[i];
+                Output.Write("[", ConsoleColor.White);
+                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.Write("] ", ConsoleColor.White);
+                Output.WriteLine(PadOrTruncate(name, width - 7));
+            }
+            else
+            {
+                Output.WriteLine();
+            }
+        }
+        Output.WriteLine();
+    }
+
+    private static TestBlock TestPaths()
+    {
+        TestBlock block = new("Path Normalization Tests");
+        CurBlock = block;
         Check(CManager.NormalizePath("/") == "/", "NormalizePath root '/'");
         Check(CManager.NormalizePath("/etc") == "/etc", "NormalizePath single dir '/etc'");
         Check(CManager.NormalizePath("///var///") == "/var", "NormalizePath multiple slashes '///var///'");
@@ -93,11 +165,13 @@ public static class ComprehensiveCommandTests
         Check(CManager.ResolvePath("docs/readme.txt") == "/home/user/docs/readme.txt", "ResolvePath nested relative");
         Check(CManager.ResolvePath("../etc") == "/home/etc", "ResolvePath relative with parent '..'");
         CManager.CurrentDirectory = old;
+        return block;
     }
 
-    private static void TestCdPwd()
+    private static TestBlock TestCdPwd()
     {
-        Output.WriteDirectLine("--- cd & pwd Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("cd & pwd Tests");
+        CurBlock = block;
         Check(Exec("cd") == 0 && CManager.CurrentDirectory == "/", "cd with no arguments resets CWD to '/'");
         Check(Exec("pwd") == 0, "pwd in '/' exits 0");
         Check(Exec("cd /etc") == 0 && CManager.CurrentDirectory == "/etc", "cd /etc sets CWD to '/etc'");
@@ -116,11 +190,13 @@ public static class ComprehensiveCommandTests
 
         Check(Exec("cd --help") == 0, "cd --help exits with 0");
         CManager.CurrentDirectory = "/";
+        return block;
     }
 
-    private static void TestTouch()
+    private static TestBlock TestTouch()
     {
-        Output.WriteDirectLine("--- touch Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("touch Tests");
+        CurBlock = block;
         Check(Exec("touch") == 0, "touch without operands handles gracefully");
 
         string target = "/tmp/test_touch_single.txt";
@@ -144,11 +220,13 @@ public static class ComprehensiveCommandTests
         VfsManager.TryUnlink(f2);
         VfsManager.TryUnlink("/tmp/" + rel);
         CManager.CurrentDirectory = "/";
+        return block;
     }
 
-    private static void TestCat()
+    private static TestBlock TestCat()
     {
-        Output.WriteDirectLine("--- cat Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("cat Tests");
+        CurBlock = block;
         Check(Exec("cat /etc/hostname") == 0, "cat /etc/hostname succeeds");
         Check(Exec("cat /etc/hostname /etc/motd") == 0, "cat multiple files succeeds");
         Check(Exec("cat -n /etc/os-release") == 0, "cat -n succeeds");
@@ -161,11 +239,13 @@ public static class ComprehensiveCommandTests
         Check(Exec("cat /etc") == 0, "cat on directory detects and handles gracefully");
         Check(Exec("cat") == 0, "cat with no args prints usage and exits cleanly");
         Check(Exec("cat --help") == 0, "cat --help exits 0");
+        return block;
     }
 
-    private static void TestMkdir()
+    private static TestBlock TestMkdir()
     {
-        Output.WriteDirectLine("--- mkdir Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("mkdir Tests");
+        CurBlock = block;
         Check(Exec("mkdir") == 0, "mkdir without operands handles gracefully");
 
         string dir1 = "/tmp/test_mkdir_single";
@@ -189,11 +269,13 @@ public static class ComprehensiveCommandTests
         VfsManager.TryRemoveDirectory("/tmp/test_deep");
         VfsManager.TryRemoveDirectory(dir1);
         CManager.CurrentDirectory = "/";
+        return block;
     }
 
-    private static void TestRm()
+    private static TestBlock TestRm()
     {
-        Output.WriteDirectLine("--- rm Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("rm Tests");
+        CurBlock = block;
         Check(Exec("rm") == 0, "rm without operands handles gracefully");
 
         string target = "/tmp/test_rm_single.txt";
@@ -214,11 +296,13 @@ public static class ComprehensiveCommandTests
         VfsManager.TryCreateFile(f1, (VfsMode)420);
         VfsManager.TryCreateFile(f2, (VfsMode)420);
         Check(Exec($"rm -f {f1} {f2}") == 0 && !VfsManager.TryStat(f1, out _) && !VfsManager.TryStat(f2, out _), "rm -f removes multiple files");
+        return block;
     }
 
-    private static void TestRmdir()
+    private static TestBlock TestRmdir()
     {
-        Output.WriteDirectLine("--- rmdir Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("rmdir Tests");
+        CurBlock = block;
         Check(Exec("rmdir") == 0, "rmdir without operands handles gracefully");
 
         string empty = "/tmp/test_rmdir_empty";
@@ -240,11 +324,13 @@ public static class ComprehensiveCommandTests
         VfsManager.TryUnlink(reg);
 
         Check(Exec("rmdir /tmp/nonexistent_dir_999") == 0, "rmdir nonexistent directory handles gracefully");
+        return block;
     }
 
-    private static void TestStat()
+    private static TestBlock TestStat()
     {
-        Output.WriteDirectLine("--- stat Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("stat Tests");
+        CurBlock = block;
         Check(Exec("stat") == 0, "stat without operands handles gracefully");
         Check(Exec("stat /etc/hostname") == 0, "stat on regular file /etc/hostname succeeds");
         Check(Exec("stat /etc") == 0, "stat on directory /etc succeeds");
@@ -255,11 +341,13 @@ public static class ComprehensiveCommandTests
 
         Check(Exec("stat /nonexistent_stat_xyz") == 0, "stat on nonexistent path handles gracefully");
         Check(Exec("stat --help") == 0, "stat --help exits 0");
+        return block;
     }
 
-    private static void TestDf()
+    private static TestBlock TestDf()
     {
-        Output.WriteDirectLine("--- df Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("df Tests");
+        CurBlock = block;
         Check(Exec("df") == 0, "df default executes and exits 0");
         Check(Exec("df -h") == 0, "df -h executes and exits 0");
         Check(Exec("df -k") == 0, "df -k executes and exits 0");
@@ -267,11 +355,13 @@ public static class ComprehensiveCommandTests
         Check(Exec("df /") == 0, "df / executes and exits 0");
         Check(Exec("df -h /") == 0, "df -h / executes and exits 0");
         Check(Exec("df --help") == 0, "df --help exits 0");
+        return block;
     }
 
-    private static void TestUname()
+    private static TestBlock TestUname()
     {
-        Output.WriteDirectLine("--- uname Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("uname Tests");
+        CurBlock = block;
         string[] flags = ["", "-s", "-n", "-r", "-v", "-m", "-a", "-srm", "-snrvm"];
         bool all = true;
         foreach (string flag in flags)
@@ -282,21 +372,25 @@ public static class ComprehensiveCommandTests
         Check(all, "uname supports all individual and combined flags");
         Check(Exec("uname -z") == 0, "uname handles invalid flag gracefully");
         Check(Exec("uname --help") == 0, "uname --help exits 0");
+        return block;
     }
 
-    private static void TestUptime()
+    private static TestBlock TestUptime()
     {
-        Output.WriteDirectLine("--- uptime Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("uptime Tests");
+        CurBlock = block;
         Check(Exec("uptime") == 0, "uptime executes and exits 0");
         Check(Exec("uptime -p") == 0, "uptime -p executes and exits 0");
         Check(Exec("uptime -s") == 0, "uptime -s executes and exits 0");
         Check(Exec("uptime --unknown") == 0, "uptime handles invalid option gracefully");
         Check(Exec("uptime --help") == 0, "uptime --help exits 0");
+        return block;
     }
 
-    private static void TestFree()
+    private static TestBlock TestFree()
     {
-        Output.WriteDirectLine("--- free Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("free Tests");
+        CurBlock = block;
         string[] cmds = ["free", "free -b", "free -k", "free -m", "free -h", "free --human", "free --mega"];
         bool all = true;
         foreach (string cmd in cmds)
@@ -306,11 +400,13 @@ public static class ComprehensiveCommandTests
         Check(all, "free supports -b, -k, -m, -h, --human, --mega");
         Check(Exec("free -x") == 0, "free handles invalid option gracefully");
         Check(Exec("free --help") == 0, "free --help exits 0");
+        return block;
     }
 
-    private static void TestLifecycle()
+    private static TestBlock TestLifecycle()
     {
-        Output.WriteDirectLine("--- End-To-End Developer Workflow Lifecycle ---", ConsoleColor.Yellow);
+        TestBlock block = new("Workflow Lifecycle Tests");
+        CurBlock = block;
         CManager.CurrentDirectory = "/";
         Check(CManager.CurrentDirectory == "/", "Workflow starts at '/'");
 
@@ -347,11 +443,13 @@ public static class ComprehensiveCommandTests
         Exec("cd /");
         Exec($"rmdir {ws}");
         Check(!VfsManager.TryStat(ws, out _), "e2e: workspace fully removed and cleaned up");
+        return block;
     }
 
-    private static void TestBg()
+    private static TestBlock TestBg()
     {
-        Output.WriteDirectLine("--- Background Execution of Utilities (&) ---", ConsoleColor.Yellow);
+        TestBlock block = new("Background Execution (&)");
+        CurBlock = block;
         string bgFile = "/tmp/test_bg_touch.txt";
         VfsManager.TryUnlink(bgFile);
 
@@ -368,11 +466,13 @@ public static class ComprehensiveCommandTests
         waited = PManager.Wait(1, pid, out code);
         Check(waited && code == 0, "background rm finishes and reaps with exit 0");
         Check(!VfsManager.TryStat(bgFile, out _), "background rm actually deleted file");
+        return block;
     }
 
-    private static void TestDmesg()
+    private static TestBlock TestDmesg()
     {
-        Output.WriteDirectLine("--- dmesg & syslog Integration Tests ---", ConsoleColor.Yellow);
+        TestBlock block = new("dmesg & syslog Tests");
+        CurBlock = block;
         Syslogd.Info("test_suite", "Comprehensive test suite entry 1");
         Syslogd.Warn("test_suite", "Comprehensive test suite entry 2");
         Syslogd.Error("test_suite", "Comprehensive test suite entry 3");
@@ -380,6 +480,7 @@ public static class ComprehensiveCommandTests
         var logs = Syslogd.GetRecentLogs();
         Check(logs.Count >= 3, "Syslog captured all test messages");
         Check(Exec("dmesg") == 0, "dmesg displays logged system messages");
+        return block;
     }
 
     private static void Check(bool condition, string name)
@@ -387,13 +488,13 @@ public static class ComprehensiveCommandTests
         if (condition)
         {
             Passed++;
-            OutputInfo.Test(true, name);
+            CurBlock?.Items.Add((true, name));
         }
         else
         {
             Failed++;
             FailedTests.Add(name);
-            OutputInfo.Test(false, name);
+            CurBlock?.Items.Add((false, name));
         }
     }
 }

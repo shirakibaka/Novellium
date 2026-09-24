@@ -25,6 +25,7 @@ public static class PManager
         lock (Procs)
         {
             Procs.Clear();
+            ReapedExitCodes.Clear();
             NextPid = KernelPid + 1;
             Procs.Add(new PInfo
             {
@@ -191,6 +192,8 @@ public static class PManager
         }
     }
 
+    private static readonly Dictionary<int, int> ReapedExitCodes = new();
+
     public static bool Reap(int parentPid, int pid, out int exitCode)
     {
         exitCode = 0;
@@ -203,6 +206,7 @@ public static class PManager
                     continue;
 
                 exitCode = p.ExitCode;
+                ReapedExitCodes[pid] = exitCode;
                 Procs.RemoveAt(i);
                 return true;
             }
@@ -226,6 +230,7 @@ public static class PManager
                 {
                     reaped ??= new();
                     reaped.Add(p.Pid);
+                    ReapedExitCodes[p.Pid] = p.ExitCode;
                     Procs.RemoveAt(i);
                     count++;
                 }
@@ -306,7 +311,20 @@ public static class PManager
                 if (checkPid > 0 && IsKillReq(checkPid)) return false;
 
                 PInfo? p = Get(pid);
-                if (p == null || p.Value.ParentPid != parentPid) return false;
+                if (p == null)
+                {
+                    lock (Procs)
+                    {
+                        if (ReapedExitCodes.TryGetValue(pid, out int reapedCode))
+                        {
+                            exitCode = reapedCode;
+                            ReapedExitCodes.Remove(pid);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                if (p.Value.ParentPid != parentPid) return false;
 
                 if (p.Value.State == PState.Zombie)
                     return Reap(parentPid, pid, out exitCode);
