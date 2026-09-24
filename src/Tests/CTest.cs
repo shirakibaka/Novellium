@@ -30,33 +30,42 @@ public static class CommandTests
     public static void Run()
     {
         Passed = 0; Failed = 0; FailedTests.Clear();
-        Output.WriteLine("=== COMMAND TESTS ===", ConsoleColor.Cyan);
+        Output.WriteDirectLine("=== COMMAND TESTS ===", ConsoleColor.Cyan);
 
-        TestUnknownCommand();
-        TestForeground();
-        TestBackground();
-        TestLsCommand();
-        TestFilesystemCommands();
-        TestSystemInfoCommands();
-        TestHelpCommand();
-        TestCommandHelpFlags();
-        TestDmesgCommand();
-        TestSyslogd();
-        TestClearCommand();
+        Output.StartCapture();
+        try
+        {
+            TestUnknownCommand();
+            TestForeground();
+            TestBackground();
+            TestLsCommand();
+            TestFilesystemCommands();
+            TestSystemInfoCommands();
+            TestHelpCommand();
+            TestCommandHelpFlags();
+            TestDmesgCommand();
+            TestSyslogd();
+            TestClearCommand();
+        }
+        finally
+        {
+            Output.StopCapture();
+        }
+
         ComprehensiveCommandTests.Run();
 
-        Output.WriteLine();
+        Output.WriteDirectLine();
         if (Failed == 0)
         {
-            Output.WriteLine($"RESULT: {Passed} passed", ConsoleColor.Green);
+            Output.WriteDirectLine($"RESULT: {Passed} passed", ConsoleColor.Green);
         }
         else
         {
-            Output.WriteLine($"RESULT: {Passed} passed, {Failed} failed", ConsoleColor.Red);
-            Output.WriteLine("Failed tests:", ConsoleColor.Red);
-            foreach (string fail in FailedTests) Output.WriteLine($"  - {fail}", ConsoleColor.Red);
+            Output.WriteDirectLine($"RESULT: {Passed} passed, {Failed} failed", ConsoleColor.Red);
+            Output.WriteDirectLine("Failed tests:", ConsoleColor.Red);
+            foreach (string fail in FailedTests) Output.WriteDirectLine($"  - {fail}", ConsoleColor.Red);
         }
-        Output.WriteLine();
+        Output.WriteDirectLine();
     }
 
     private static void TestUnknownCommand()

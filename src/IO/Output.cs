@@ -1,5 +1,6 @@
 // Output.cs — Thread-safe console I/O and formatted diagnostic logging
 using System;
+using System.Text;
 using Novellium.Services;
 
 namespace Novellium.IO;
@@ -7,30 +8,94 @@ namespace Novellium.IO;
 public static class Output
 {
     private static readonly object Lock = new();
+    private static bool IsCapturing = false;
+    private static readonly StringBuilder CapturedBuffer = new();
+
+    public static void StartCapture()
+    {
+        lock (Lock)
+        {
+            CapturedBuffer.Clear();
+            IsCapturing = true;
+        }
+    }
+
+    public static string StopCapture()
+    {
+        lock (Lock)
+        {
+            IsCapturing = false;
+            string text = CapturedBuffer.ToString();
+            CapturedBuffer.Clear();
+            return text;
+        }
+    }
+
+    public static bool IsCaptureActive
+    {
+        get { lock (Lock) return IsCapturing; }
+    }
+
+    public static void WriteDirectLine(string text = "", ConsoleColor? color = null)
+    {
+        lock (Lock)
+        {
+            if (color.HasValue)
+            {
+                ConsoleColor prev = Console.ForegroundColor;
+                Console.ForegroundColor = color.Value;
+                Console.WriteLine(text);
+                Console.ForegroundColor = prev;
+            }
+            else
+            {
+                Console.WriteLine(text);
+            }
+        }
+    }
 
     public static void Write(string text)
     {
-        lock (Lock) Console.Write(text);
+        lock (Lock)
+        {
+            if (IsCapturing) CapturedBuffer.Append(text);
+            else Console.Write(text);
+        }
     }
 
     public static void WriteLine(string text)
     {
-        lock (Lock) Console.WriteLine(text);
+        lock (Lock)
+        {
+            if (IsCapturing) CapturedBuffer.AppendLine(text);
+            else Console.WriteLine(text);
+        }
     }
 
     public static void WriteLine()
     {
-        lock (Lock) Console.WriteLine();
+        lock (Lock)
+        {
+            if (IsCapturing) CapturedBuffer.AppendLine();
+            else Console.WriteLine();
+        }
     }
 
     public static void Write(string text, ConsoleColor color)
     {
         lock (Lock)
         {
-            ConsoleColor prev = Console.ForegroundColor;
-            Console.ForegroundColor = color;
-            Console.Write(text);
-            Console.ForegroundColor = prev;
+            if (IsCapturing)
+            {
+                CapturedBuffer.Append(text);
+            }
+            else
+            {
+                ConsoleColor prev = Console.ForegroundColor;
+                Console.ForegroundColor = color;
+                Console.Write(text);
+                Console.ForegroundColor = prev;
+            }
         }
     }
 
@@ -38,10 +103,17 @@ public static class Output
     {
         lock (Lock)
         {
-            ConsoleColor prev = Console.ForegroundColor;
-            Console.ForegroundColor = color;
-            Console.WriteLine(text);
-            Console.ForegroundColor = prev;
+            if (IsCapturing)
+            {
+                CapturedBuffer.AppendLine(text);
+            }
+            else
+            {
+                ConsoleColor prev = Console.ForegroundColor;
+                Console.ForegroundColor = color;
+                Console.WriteLine(text);
+                Console.ForegroundColor = prev;
+            }
         }
     }
 
@@ -52,7 +124,10 @@ public static class Output
 
     public static void Clear()
     {
-        lock (Lock) Console.Clear();
+        lock (Lock)
+        {
+            if (!IsCapturing) Console.Clear();
+        }
     }
 
     public static void WriteTag(string tag, ConsoleColor tagColor, string text, ConsoleColor? textColor = null)

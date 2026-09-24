@@ -31,9 +31,10 @@ public static class ComprehensiveCommandTests
     public static void Run()
     {
         Passed = 0; Failed = 0; FailedTests.Clear();
-        Output.WriteLine("=== COMPREHENSIVE COMMAND & FILESYSTEM TEST SUITE ===", ConsoleColor.Magenta);
+        Output.WriteDirectLine("=== COMPREHENSIVE COMMAND & FILESYSTEM TEST SUITE ===", ConsoleColor.Magenta);
 
         string oldCwd = CManager.CurrentDirectory;
+        Output.StartCapture();
         try
         {
             TestPaths();
@@ -52,19 +53,23 @@ public static class ComprehensiveCommandTests
             TestBg();
             TestDmesg();
         }
-        finally { CManager.CurrentDirectory = oldCwd; }
+        finally
+        {
+            Output.StopCapture();
+            CManager.CurrentDirectory = oldCwd;
+        }
 
-        Output.WriteLine();
+        Output.WriteDirectLine();
         if (Failed == 0)
         {
-            Output.WriteLine($"COMPREHENSIVE SUITE RESULT: All {Passed} tests passed successfully!", ConsoleColor.Green);
+            Output.WriteDirectLine($"COMPREHENSIVE SUITE RESULT: All {Passed} tests passed successfully!", ConsoleColor.Green);
         }
         else
         {
-            Output.WriteLine($"COMPREHENSIVE SUITE RESULT: {Passed} passed, {Failed} failed!", ConsoleColor.Red);
-            foreach (string f in FailedTests) Output.WriteLine($"  - {f}", ConsoleColor.Red);
+            Output.WriteDirectLine($"COMPREHENSIVE SUITE RESULT: {Passed} passed, {Failed} failed!", ConsoleColor.Red);
+            foreach (string f in FailedTests) Output.WriteDirectLine($"  - {f}", ConsoleColor.Red);
         }
-        Output.WriteLine();
+        Output.WriteDirectLine();
     }
 
     private static void TestPaths()
