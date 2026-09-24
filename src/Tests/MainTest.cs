@@ -67,6 +67,7 @@ public static class MainTest
             blocks.Add(TestCdAndPwdCommands());
             blocks.Add(TestFileCommands());
             blocks.Add(TestSystemInfoUtilities());
+            blocks.Add(TestUnixCoreutilsAndRedirection());
         }
         finally
         {
@@ -445,6 +446,43 @@ public static class MainTest
             if (Exec(c) != 0) { flagsOk = false; break; }
         }
         Check(flagsOk, "Universal -h/--help flags (21)");
+
+        return block;
+    }
+
+    private static TestBlock TestUnixCoreutilsAndRedirection()
+    {
+        TestBlock block = new("Unix Utilities & Redirection");
+        CurBlock = block;
+
+        string rFile = "/tmp/unix_test.txt";
+        Exec($"echo \"alpha\nbeta\ngamma\ndelta\nepsilon\" > {rFile}");
+        Check(VfsManager.TryStat(rFile, out _), "echo with output redirection (>)");
+
+        Exec($"echo \"zeta\" >> {rFile}");
+        string content = CManager.ReadFileText(rFile);
+        Check(content.Contains("zeta"), "echo append redirection (>>)");
+
+        Exec($"cat {rFile} | grep beta > /tmp/grep_res.txt");
+        string grepOut = CManager.ReadFileText("/tmp/grep_res.txt").Trim();
+        Check(grepOut == "beta", "Piping cat | grep > file");
+
+        Exec($"cat {rFile} | head -n 2 > /tmp/head_res.txt");
+        string headOut = CManager.ReadFileText("/tmp/head_res.txt").Trim();
+        Check(headOut == "alpha\nbeta", "Piping cat | head -n 2");
+
+        Exec($"cat {rFile} | tail -n 2 > /tmp/tail_res.txt");
+        string tailOut = CManager.ReadFileText("/tmp/tail_res.txt").Trim();
+        Check(tailOut == "epsilon\nzeta", "Piping cat | tail -n 2");
+
+        Exec($"cat {rFile} | wc -l > /tmp/wc_res.txt");
+        string wcOut = CManager.ReadFileText("/tmp/wc_res.txt").Trim();
+        Check(wcOut.Contains("6"), "Piping cat | wc -l count");
+
+        Exec($"echo \"tee_data\" | tee /tmp/tee1.txt /tmp/tee2.txt > /dev/null");
+        Check(CManager.ReadFileText("/tmp/tee1.txt").Trim() == "tee_data" && CManager.ReadFileText("/tmp/tee2.txt").Trim() == "tee_data", "tee dual file output");
+
+        Exec($"rm -f {rFile} /tmp/grep_res.txt /tmp/head_res.txt /tmp/tail_res.txt /tmp/wc_res.txt /tmp/tee1.txt /tmp/tee2.txt");
 
         return block;
     }

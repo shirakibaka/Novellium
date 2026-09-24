@@ -52,6 +52,12 @@ public static class CmdRegistry
         Register(new CmdEntry("sleep", "sleep <seconds>", "delay for a specified number of seconds", Sleep.Run, Sleep.Help));
         Register(new CmdEntry("dmesg", "dmesg [options]", "print system and kernel log buffer", Dmesg.Run, Dmesg.Help));
         Register(new CmdEntry("clear", "clear", "clear the terminal screen", Clear.Run, Clear.Help, isBuiltin: true));
+        Register(new CmdEntry("echo", "echo [-n] [string]...", "print text to output", Echo.Run, Echo.Help, isBuiltin: true));
+        Register(new CmdEntry("grep", "grep [options] pattern [file]...", "print lines matching a pattern", Grep.Run, Grep.Help));
+        Register(new CmdEntry("head", "head [-n NUM] [file]...", "output the first part of files", Head.Run, Head.Help));
+        Register(new CmdEntry("tail", "tail [-n NUM] [file]...", "output the last part of files", Tail.Run, Tail.Help));
+        Register(new CmdEntry("wc", "wc [-l|-w|-c] [file]...", "print line, word, and byte counts", Wc.Run, Wc.Help));
+        Register(new CmdEntry("tee", "tee [-a] [file]...", "read from standard input and write to standard output and files", Tee.Run, Tee.Help));
         Register(new CmdEntry("test", "test [suite]", "run kernel and command automated test suites", Test.Run, Test.Help));
     }
 

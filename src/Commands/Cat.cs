@@ -28,14 +28,27 @@ public static class Cat
             else files.Add(a);
         }
 
-        if (files.Count == 0)
+        int line = 1;
+        if (files.Count == 0 || (files.Count == 1 && files[0] == "-"))
         {
-            Output.WriteLine("usage: cat [OPTION]... [FILE]...", ConsoleColor.Yellow);
-            Output.WriteLine("Try 'cat --help' for more information.", ConsoleColor.Gray);
+            string stdin = Output.GetStdin();
+            if (!num)
+            {
+                Output.Write(stdin);
+                if (!stdin.EndsWith('\n')) Output.WriteLine();
+            }
+            else
+            {
+                string[] lines = stdin.Split('\n');
+                for (int j = 0; j < lines.Length; j++)
+                {
+                    if (j == lines.Length - 1 && string.IsNullOrEmpty(lines[j])) break;
+                    Output.WriteLine($"{line,6}  {lines[j]}");
+                    line++;
+                }
+            }
             return;
         }
-
-        int line = 1;
         foreach (string f in files)
         {
             string path = CManager.ResolvePath(f);

@@ -11,6 +11,30 @@ public static class Output
     private static bool IsCapturing = false;
     private static readonly StringBuilder CapturedBuffer = new();
 
+    [ThreadStatic]
+    private static string? _threadStdin;
+
+    [ThreadStatic]
+    private static StringBuilder? _threadStdoutBuffer;
+
+    public static void SetStdin(string? input) => _threadStdin = input;
+    public static string GetStdin() => _threadStdin ?? string.Empty;
+
+    public static void StartRedirection()
+    {
+        _threadStdoutBuffer = new StringBuilder();
+    }
+
+    public static string StopRedirection()
+    {
+        if (_threadStdoutBuffer == null) return string.Empty;
+        string res = _threadStdoutBuffer.ToString();
+        _threadStdoutBuffer = null;
+        return res;
+    }
+
+    public static bool IsRedirected => _threadStdoutBuffer != null;
+
     public static void StartCapture()
     {
         lock (Lock)
@@ -58,7 +82,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (IsCapturing) CapturedBuffer.Append(text);
+            if (_threadStdoutBuffer != null) _threadStdoutBuffer.Append(text);
+            else if (IsCapturing) CapturedBuffer.Append(text);
             else Console.Write(text);
         }
     }
@@ -67,7 +92,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (IsCapturing) CapturedBuffer.AppendLine(text);
+            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine(text);
+            else if (IsCapturing) CapturedBuffer.AppendLine(text);
             else Console.WriteLine(text);
         }
     }
@@ -76,7 +102,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (IsCapturing) CapturedBuffer.AppendLine();
+            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine();
+            else if (IsCapturing) CapturedBuffer.AppendLine();
             else Console.WriteLine();
         }
     }
@@ -85,10 +112,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (IsCapturing)
-            {
-                CapturedBuffer.Append(text);
-            }
+            if (_threadStdoutBuffer != null) _threadStdoutBuffer.Append(text);
+            else if (IsCapturing) CapturedBuffer.Append(text);
             else
             {
                 ConsoleColor prev = Console.ForegroundColor;
@@ -103,10 +128,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (IsCapturing)
-            {
-                CapturedBuffer.AppendLine(text);
-            }
+            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine(text);
+            else if (IsCapturing) CapturedBuffer.AppendLine(text);
             else
             {
                 ConsoleColor prev = Console.ForegroundColor;
@@ -126,7 +149,7 @@ public static class Output
     {
         lock (Lock)
         {
-            if (!IsCapturing) Console.Clear();
+            if (_threadStdoutBuffer == null && !IsCapturing) Console.Clear();
         }
     }
 
@@ -134,6 +157,11 @@ public static class Output
     {
         lock (Lock)
         {
+            if (_threadStdoutBuffer != null || IsCapturing)
+            {
+                Write($"[{tag}] {text}\n");
+                return;
+            }
             ConsoleColor prev = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.White;
             Console.Write("[");

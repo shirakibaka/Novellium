@@ -14,4 +14,5 @@ public class PInfo
     public bool IsWaited;
     public Thread? Thread;
     public string CurrentDirectory = "/";
+    public string OutputBuffer = "";
 }

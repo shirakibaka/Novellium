@@ -1,6 +1,9 @@
-// Manager.cs — CManager: command dispatcher and path resolution
+// Manager.cs — CManager: command dispatcher, path resolution, redirection & pipelines
 using System;
 using System.Collections.Generic;
+using System.Text;
+using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
 using Novellium.Process;
 
@@ -39,12 +42,111 @@ public static class CManager
         return "/" + string.Join('/', norm);
     }
 
+    public static string ReadFileText(string path)
+    {
+        string full = ResolvePath(path);
+        if (!VfsManager.TryStat(full, out VfsStat st) || st.IsDirectory) return string.Empty;
+        if (!VfsManager.TryOpenFile(full, out var h) || h == null) return string.Empty;
+        using (h)
+        {
+            byte[] buf = new byte[1024];
+            StringBuilder sb = new();
+            long read;
+            while ((read = h.Read(buf)) > 0)
+                sb.Append(Encoding.UTF8.GetString(buf, 0, (int)read));
+            return sb.ToString();
+        }
+    }
+
+    public static bool WriteFileText(string path, string text, bool append)
+    {
+        string full = ResolvePath(path);
+        if (!append && VfsManager.TryStat(full, out _))
+        {
+            VfsManager.TryUnlink(full);
+        }
+        if (!VfsManager.TryStat(full, out _))
+        {
+            if (!VfsManager.TryCreateFile(full, (VfsMode)420)) return false;
+        }
+        if (!VfsManager.TryOpenFile(full, out var h) || h == null) return false;
+        using (h)
+        {
+            if (append) h.TrySeek(0, SeekWhence.End);
+            byte[] bytes = Encoding.UTF8.GetBytes(text);
+            h.Write(bytes);
+            h.TryFlush();
+        }
+        return true;
+    }
+
+    public static string[] SplitArgs(string input)
+    {
+        var args = new List<string>();
+        var current = new StringBuilder();
+        bool inDouble = false, inSingle = false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+            if (c == '"' && !inSingle) inDouble = !inDouble;
+            else if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (char.IsWhiteSpace(c) && !inDouble && !inSingle)
+            {
+                if (current.Length > 0)
+                {
+                    args.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else current.Append(c);
+        }
+        if (current.Length > 0) args.Add(current.ToString());
+        return args.ToArray();
+    }
+
     public static int Execute(string input, int parentPid, out bool background)
     {
         background = false;
         if (string.IsNullOrWhiteSpace(input)) return 0;
 
-        string[] args = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string trimmed = input.Trim();
+
+        List<string> stages = SplitPipeline(trimmed);
+        if (stages.Count > 1)
+        {
+            string pipeStdin = "";
+            int lastPid = 0;
+            for (int s = 0; s < stages.Count; s++)
+            {
+                bool isLast = (s == stages.Count - 1);
+                lastPid = ExecuteStage(stages[s], parentPid, out background, pipeStdin, captureStdout: !isLast, out string stageOut);
+                pipeStdin = stageOut;
+            }
+            return lastPid;
+        }
+
+        return ExecuteStage(trimmed, parentPid, out background, stdinText: null, captureStdout: false, out _);
+    }
+
+    private static int ExecuteStage(string stageStr, int parentPid, out bool background, string? stdinText, bool captureStdout, out string capturedOut)
+    {
+        capturedOut = "";
+        background = false;
+
+        ParseRedirection(stageStr, out string cleanCmd, out string? inFile, out string? outFile, out bool append);
+
+        if (inFile != null)
+        {
+            stdinText = ReadFileText(inFile);
+        }
+
+        if (outFile != null)
+        {
+            captureStdout = true;
+        }
+
+        string[] args = SplitArgs(cleanCmd);
         if (args.Length == 0) return 0;
 
         if (args[^1] == "&")
@@ -73,12 +175,108 @@ public static class CManager
             }
         }
 
+        int pid = 0;
         if (entry.IsBuiltin)
         {
-            entry.Handler(parentPid, args);
-            return 0;
+            if (stdinText != null) Output.SetStdin(stdinText);
+            if (captureStdout) Output.StartRedirection();
+            try
+            {
+                entry.Handler(parentPid, args);
+                if (captureStdout) capturedOut = Output.StopRedirection();
+            }
+            finally
+            {
+                if (stdinText != null) Output.SetStdin(null);
+            }
+        }
+        else
+        {
+            pid = PManager.Start(entry.Name, args, entry.Handler, parentPid, isWaited: !background, stdinText: stdinText, captureStdout: captureStdout);
+            if (pid > 0 && captureStdout && !background)
+            {
+                PManager.Wait(parentPid, pid, out _);
+                capturedOut = PManager.GetOutput(pid);
+            }
         }
 
-        return PManager.Start(entry.Name, args, entry.Handler, parentPid, isWaited: !background);
+        if (outFile != null)
+        {
+            WriteFileText(outFile, capturedOut, append);
+        }
+
+        return pid;
+    }
+
+    private static List<string> SplitPipeline(string input)
+    {
+        var stages = new List<string>();
+        var current = new StringBuilder();
+        bool inDouble = false, inSingle = false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+            if (c == '"' && !inSingle) inDouble = !inDouble;
+            else if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (c == '|' && !inDouble && !inSingle)
+            {
+                stages.Add(current.ToString().Trim());
+                current.Clear();
+            }
+            else current.Append(c);
+        }
+        if (current.Length > 0) stages.Add(current.ToString().Trim());
+        return stages;
+    }
+
+    private static void ParseRedirection(string cmdStr, out string cleanCmd, out string? inFile, out string? outFile, out bool append)
+    {
+        inFile = null;
+        outFile = null;
+        append = false;
+
+        var sb = new StringBuilder();
+        bool inDouble = false, inSingle = false;
+
+        for (int i = 0; i < cmdStr.Length; i++)
+        {
+            char c = cmdStr[i];
+            if (c == '"' && !inSingle) { inDouble = !inDouble; sb.Append(c); }
+            else if (c == '\'' && !inDouble) { inSingle = !inSingle; sb.Append(c); }
+            else if (c == '>' && !inDouble && !inSingle)
+            {
+                append = (i + 1 < cmdStr.Length && cmdStr[i + 1] == '>');
+                int start = append ? i + 2 : i + 1;
+                outFile = ReadToken(cmdStr, ref start);
+                i = start - 1;
+            }
+            else if (c == '<' && !inDouble && !inSingle)
+            {
+                int start = i + 1;
+                inFile = ReadToken(cmdStr, ref start);
+                i = start - 1;
+            }
+            else sb.Append(c);
+        }
+
+        cleanCmd = sb.ToString().Trim();
+    }
+
+    private static string ReadToken(string str, ref int index)
+    {
+        while (index < str.Length && char.IsWhiteSpace(str[index])) index++;
+        var sb = new StringBuilder();
+        bool inDouble = false, inSingle = false;
+        while (index < str.Length)
+        {
+            char c = str[index];
+            if (c == '"' && !inSingle) inDouble = !inDouble;
+            else if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if ((char.IsWhiteSpace(c) || c == '>' || c == '<' || c == '|') && !inDouble && !inSingle) break;
+            else sb.Append(c);
+            index++;
+        }
+        return sb.ToString();
     }
 }

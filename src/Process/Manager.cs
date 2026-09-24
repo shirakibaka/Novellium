@@ -99,7 +99,7 @@ public static class PManager
         return true;
     }
 
-    public static int Start(string name, string[] args, Action<int, string[]> entry, int parentPid = KernelPid, bool isWaited = false)
+    public static int Start(string name, string[] args, Action<int, string[]> entry, int parentPid = KernelPid, bool isWaited = false, string? stdinText = null, bool captureStdout = false)
     {
         int pid = -1;
         Thread thread;
@@ -132,14 +132,26 @@ public static class PManager
             {
                 _currentThreadPid = pid;
                 SetState(pid, PState.Running);
+                if (stdinText != null) Output.SetStdin(stdinText);
+                if (captureStdout) Output.StartRedirection();
                 try
                 {
                     entry(pid, args);
+                    if (captureStdout)
+                    {
+                        string outBuf = Output.StopRedirection();
+                        lock (Procs)
+                        {
+                            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
+                                Procs[pid]!.OutputBuffer = outBuf;
+                        }
+                    }
                     if (Get(pid)?.State == PState.Running)
                         Exit(pid, IsKillReq(pid) ? KillCode : 0);
                 }
                 catch (Exception ex)
                 {
+                    if (captureStdout) Output.StopRedirection();
                     OutputInfo.Error($"[PROCESS] PID: {pid} NAME: {name} error: {ex.Message}");
                     Exit(pid, ErrCode);
                 }
@@ -179,6 +191,16 @@ public static class PManager
         }
 
         return pid;
+    }
+
+    public static string GetOutput(int pid)
+    {
+        lock (Procs)
+        {
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
+                return Procs[pid]!.OutputBuffer;
+        }
+        return string.Empty;
     }
 
     public static PInfo? Get(int pid)
