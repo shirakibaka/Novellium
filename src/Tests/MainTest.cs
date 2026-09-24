@@ -34,7 +34,8 @@ public static class MainTest
     private static int Exec(string cmd)
     {
         int pid = CManager.Execute(cmd, 1, out _);
-        if (pid <= 0) return -1;
+        if (pid == 0) return 0;
+        if (pid < 0) return -1;
         if (!PManager.Wait(1, pid, out int code, timeoutMs: 15000))
         {
             PManager.Kill(pid);
@@ -150,7 +151,7 @@ public static class MainTest
         CurBlock = block;
 
         PInfo? k = PManager.Get(1);
-        Check(k != null && k.Value.ParentPid == 0 && k.Value.State == PState.Running, "Kernel PID 1 state");
+        Check(k != null && k.ParentPid == 0 && k.State == PState.Running, "Kernel PID 1 state");
         Check(!PManager.Kill(1), "Kernel process immortality");
 
         Syslogd.Info("main_test", "Master test suite syslog entry");
@@ -215,7 +216,7 @@ public static class MainTest
         PManager.Kill(parentPid);
         PManager.Wait(1, parentPid, out _);
         PInfo? childP = PManager.Get(childPid);
-        Check(childP != null && childP.Value.ParentPid == 1, "Process reparenting to PID 1");
+        Check(childP != null && childP.ParentPid == 1, "Process reparenting to PID 1");
         PManager.Kill(childPid);
         PManager.Wait(1, childPid, out _);
 
@@ -228,7 +229,7 @@ public static class MainTest
         Check(PManager.GetCwd(1) == "/", "Per-process CWD isolation");
 
         PInfo? kInfo = PManager.Get(1);
-        Check(kInfo != null && kInfo.Value.Name == "kernel", "Thread instance tracking");
+        Check(kInfo != null && kInfo.Name == "kernel", "Thread instance tracking");
 
         return block;
     }

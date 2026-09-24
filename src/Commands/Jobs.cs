@@ -1,7 +1,6 @@
 // Jobs.cs — jobs command: list active background jobs
 using System;
 using Novellium.IO;
-using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -9,7 +8,6 @@ public static class Jobs
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
         JManager.List();
     }
 

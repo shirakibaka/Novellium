@@ -8,7 +8,6 @@ public static class Pwd
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
         Output.WriteLine(CManager.CurrentDirectory);
     }
 

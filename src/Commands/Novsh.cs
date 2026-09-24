@@ -23,7 +23,7 @@ public static class Novsh
             if (bg)
             {
                 PInfo? p = PManager.Get(child);
-                if (p != null) JManager.Add(child, p.Value.Name);
+                if (p != null) JManager.Add(child, p.Name);
                 continue;
             }
 

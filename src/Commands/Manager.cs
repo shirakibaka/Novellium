@@ -42,6 +42,8 @@ public static class CManager
     public static int Execute(string input, int parentPid, out bool background)
     {
         background = false;
+        if (string.IsNullOrWhiteSpace(input)) return 0;
+
         string[] args = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (args.Length == 0) return 0;
 
@@ -52,38 +54,29 @@ public static class CManager
             if (args.Length == 0) return 0;
         }
 
-        string cmd = args[0].ToLower();
-        Action<int, string[]>? handler = cmd switch
+        string cmdName = args[0].ToLower();
+        CmdEntry? entry = CmdRegistry.Get(cmdName);
+        if (entry == null)
         {
-            "ls" => Ls.Run,
-            "cat" => Cat.Run,
-            "cd" => Cd.Run,
-            "pwd" => Pwd.Run,
-            "touch" => Touch.Run,
-            "mkdir" => Mkdir.Run,
-            "rm" => Rm.Run,
-            "rmdir" => Rmdir.Run,
-            "df" => Df.Run,
-            "stat" => Stat.Run,
-            "uname" => Uname.Run,
-            "uptime" => Uptime.Run,
-            "free" => Free.Run,
-            "ps" => Ps.Run,
-            "jobs" => Jobs.Run,
-            "sleep" => Sleep.Run,
-            "kill" => Kill.Run,
-            "wait" => Wait.Run,
-            "help" => Help.Run,
-            "dmesg" => Dmesg.Run,
-            "clear" => Clear.Run,
-            "test" => Test.Run,
-            _ => null
-        };
+            Output.WriteLine($"Unknown command: {cmdName}");
+            return 0;
+        }
 
-        if (handler != null)
-            return PManager.Start(cmd, args, handler, parentPid, isWaited: !background);
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] is "-h" or "--help")
+            {
+                entry.HelpHandler();
+                return 0;
+            }
+        }
 
-        Output.WriteLine($"Unknown command: {cmd}");
-        return 0;
+        if (entry.IsBuiltin)
+        {
+            entry.Handler(parentPid, args);
+            return 0;
+        }
+
+        return PManager.Start(entry.Name, args, entry.Handler, parentPid, isWaited: !background);
     }
 }

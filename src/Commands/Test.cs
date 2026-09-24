@@ -9,8 +9,6 @@ public static class Test
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
-
         MainTest.Run();
     }
 
@@ -20,6 +18,6 @@ public static class Test
         Output.WriteLine("Run Novellium unified master integration test suite.", ConsoleColor.Gray);
         Output.WriteLine();
         Output.WriteLine("Options:", ConsoleColor.White);
-        Output.WriteLine("  -h, --help display this help and exit", ConsoleColor.Gray);
+        Output.WriteLine("  -h, --help    display this help and exit", ConsoleColor.Gray);
     }
 }

@@ -76,13 +76,13 @@ public static class JManager
             if (j.IsWaited) continue;
 
             PInfo? p = PManager.Get(j.Pid);
-            if (p == null || p.Value.ParentPid != parentPid)
+            if (p == null || p.ParentPid != parentPid)
             {
                 Remove(j.Pid, out _);
                 continue;
             }
 
-            if (p.Value.State != PState.Zombie) continue;
+            if (p.State != PState.Zombie) continue;
             if (!PManager.Reap(parentPid, j.Pid, out int code)) continue;
 
             done ??= new();
@@ -104,18 +104,7 @@ public static class JManager
         foreach (Job j in snap)
         {
             PInfo? p = PManager.Get(j.Pid);
-            if (p != null) Output.WriteLine($"[{j.Id}] {j.Pid} {p.Value.State} {j.Name}");
+            if (p != null) Output.WriteLine($"[{j.Id}] {j.Pid} {p.State} {j.Name}");
         }
     }
-}
-
-public static class JobManager
-{
-    public static void Initialize() => JManager.Init();
-    public static void Init() => JManager.Init();
-    public static void Add(int pid, string name) => JManager.Add(pid, name);
-    public static bool SetWaited(int pid, bool waited) => JManager.SetWaited(pid, waited);
-    public static bool Remove(int pid, out int id) => JManager.Remove(pid, out id);
-    public static int Update(int parentPid) => JManager.Update(parentPid);
-    public static void List() => JManager.List();
 }

@@ -58,7 +58,7 @@ public static class Syslogd
         {
             if (Pid <= 0) return false;
             PInfo? p = PManager.Get(Pid);
-            return p != null && p.Value.State == PState.Running;
+            return p != null && p.State == PState.Running;
         }
     }
 

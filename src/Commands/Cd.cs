@@ -11,8 +11,6 @@ public static class Cd
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
-
         string target = args.Length > 1 ? CManager.ResolvePath(args[1]) : "/";
         if (!VfsManager.TryStat(target, out VfsStat stat))
         {
@@ -26,8 +24,6 @@ public static class Cd
         }
 
         PManager.SetCwd(pid, target);
-        int parentPid = PManager.GetParentPid(pid);
-        if (parentPid > 0) PManager.SetCwd(parentPid, target);
     }
 
     public static void Help()

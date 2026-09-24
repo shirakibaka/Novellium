@@ -10,13 +10,27 @@ namespace Novellium.Process;
 public static class PManager
 {
     public const int KernelPid = 1;
+    public const int MaxProcesses = 64;
     private const int KillCode = 137;
     private const int ErrCode = 1;
 
-    private static readonly List<PInfo> Procs = new();
+    private static readonly PInfo?[] Procs = new PInfo?[MaxProcesses];
     private static int NextPid = KernelPid + 1;
 
-    public static int Count { get { lock (Procs) return Procs.Count; } }
+    public static int Count
+    {
+        get
+        {
+            lock (Procs)
+            {
+                int count = 0;
+                for (int i = 0; i < MaxProcesses; i++)
+                    if (Procs[i] != null) count++;
+                return count;
+            }
+        }
+    }
+
     internal static bool SimulateThreadStartFailure = false;
     public static bool AutomaticOrphanReaping { get; set; } = true;
 
@@ -29,8 +43,11 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
-                if (Procs[i].Pid == pid) return string.IsNullOrEmpty(Procs[i].CurrentDirectory) ? "/" : Procs[i].CurrentDirectory;
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
+            {
+                string cwd = Procs[pid]!.CurrentDirectory;
+                return string.IsNullOrEmpty(cwd) ? "/" : cwd;
+            }
         }
         return "/";
     }
@@ -39,15 +56,10 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                if (Procs[i].Pid == pid)
-                {
-                    PInfo p = Procs[i];
-                    p.CurrentDirectory = cwd;
-                    Procs[i] = p;
-                    return true;
-                }
+                Procs[pid]!.CurrentDirectory = cwd;
+                return true;
             }
         }
         return false;
@@ -57,8 +69,8 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
-                if (Procs[i].Pid == pid) return Procs[i].ParentPid;
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
+                return Procs[pid]!.ParentPid;
         }
         return 0;
     }
@@ -67,10 +79,9 @@ public static class PManager
     {
         lock (Procs)
         {
-            Procs.Clear();
-            ReapedExitCodes.Clear();
+            Array.Clear(Procs, 0, Procs.Length);
             NextPid = KernelPid + 1;
-            Procs.Add(new PInfo
+            Procs[KernelPid] = new PInfo
             {
                 Pid = KernelPid,
                 ParentPid = 0,
@@ -81,19 +92,32 @@ public static class PManager
                 IsWaited = false,
                 Thread = null,
                 CurrentDirectory = "/"
-            });
+            };
         }
         return true;
     }
 
     public static int Start(string name, string[] args, Action<int, string[]> entry, int parentPid = KernelPid, bool isWaited = false)
     {
-        int pid;
+        int pid = -1;
         Thread thread;
 
         lock (Procs)
         {
-            pid = NextPid++;
+            for (int attempts = 0; attempts < MaxProcesses - 1; attempts++)
+            {
+                int candidate = NextPid++;
+                if (NextPid >= MaxProcesses) NextPid = KernelPid + 1;
+
+                if (Procs[candidate] == null)
+                {
+                    pid = candidate;
+                    break;
+                }
+            }
+
+            if (pid == -1) return -1;
+
             string initialCwd = GetCwd(parentPid);
 
             thread = new(() =>
@@ -112,7 +136,7 @@ public static class PManager
                 }
             });
 
-            Procs.Add(new PInfo
+            Procs[pid] = new PInfo
             {
                 Pid = pid,
                 ParentPid = parentPid,
@@ -123,7 +147,7 @@ public static class PManager
                 IsWaited = isWaited,
                 Thread = thread,
                 CurrentDirectory = initialCwd
-            });
+            };
         }
 
         try
@@ -137,14 +161,7 @@ public static class PManager
         {
             lock (Procs)
             {
-                for (int i = 0; i < Procs.Count; i++)
-                {
-                    if (Procs[i].Pid == pid)
-                    {
-                        Procs.RemoveAt(i);
-                        break;
-                    }
-                }
+                if (pid >= 0 && pid < MaxProcesses) Procs[pid] = null;
             }
 
             if (!SimulateThreadStartFailure)
@@ -159,16 +176,19 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
-                if (Procs[i].Pid == pid) return Procs[i];
+            if (pid >= 0 && pid < MaxProcesses) return Procs[pid];
+            return null;
         }
-        return null;
     }
 
     public static void List()
     {
-        List<PInfo> snap;
-        lock (Procs) snap = new(Procs);
+        List<PInfo> snap = new();
+        lock (Procs)
+        {
+            for (int i = 0; i < MaxProcesses; i++)
+                if (Procs[i] != null) snap.Add(Procs[i]!);
+        }
 
         Output.WriteLine($"{"PID",-6}{"PPID",-6}{"THREAD",-8}{"STATE",-12}{"EXIT",-7}NAME");
         foreach (PInfo p in snap)
@@ -185,32 +205,26 @@ public static class PManager
 
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                if (Procs[i].Pid != pid) continue;
-
-                PInfo p = Procs[i];
+                PInfo p = Procs[pid]!;
                 if (p.State is PState.Zombie or PState.Terminated or PState.Failed)
                     return false;
 
                 // Reparent orphan children to PID 1 (kernel) upon parent exit
-                for (int j = 0; j < Procs.Count; j++)
+                for (int j = 0; j < MaxProcesses; j++)
                 {
-                    if (Procs[j].ParentPid == pid)
+                    if (Procs[j] != null && Procs[j]!.ParentPid == pid)
                     {
-                        PInfo child = Procs[j];
-                        child.ParentPid = KernelPid;
-                        Procs[j] = child;
+                        Procs[j]!.ParentPid = KernelPid;
                         reparented ??= new();
-                        reparented.Add(child.Pid);
+                        reparented.Add(j);
                     }
                 }
 
                 p.ExitCode = exitCode;
                 p.State = PState.Zombie;
-                Procs[i] = p;
                 exited = true;
-                break;
             }
         }
 
@@ -229,34 +243,27 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                if (Procs[i].Pid != pid) continue;
-                PInfo p = Procs[i];
-                p.State = state;
-                Procs[i] = p;
-                return;
+                Procs[pid]!.State = state;
             }
         }
     }
-
-    private static readonly Dictionary<int, int> ReapedExitCodes = new();
 
     public static bool Reap(int parentPid, int pid, out int exitCode)
     {
         exitCode = 0;
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                PInfo p = Procs[i];
-                if (p.Pid != pid || p.ParentPid != parentPid || p.State != PState.Zombie)
-                    continue;
-
-                exitCode = p.ExitCode;
-                ReapedExitCodes[pid] = exitCode;
-                Procs.RemoveAt(i);
-                return true;
+                PInfo p = Procs[pid]!;
+                if (p.ParentPid == parentPid && p.State == PState.Zombie)
+                {
+                    exitCode = p.ExitCode;
+                    Procs[pid] = null;
+                    return true;
+                }
             }
         }
         return false;
@@ -271,15 +278,14 @@ public static class PManager
 
         lock (Procs)
         {
-            for (int i = Procs.Count - 1; i >= 0; i--)
+            for (int i = 0; i < MaxProcesses; i++)
             {
-                PInfo p = Procs[i];
-                if (p.Pid != KernelPid && p.ParentPid == KernelPid && p.State == PState.Zombie && !p.IsWaited)
+                PInfo? p = Procs[i];
+                if (p != null && p.Pid != KernelPid && p.ParentPid == KernelPid && p.State == PState.Zombie && !p.IsWaited)
                 {
                     reaped ??= new();
                     reaped.Add(p.Pid);
-                    ReapedExitCodes[p.Pid] = p.ExitCode;
-                    Procs.RemoveAt(i);
+                    Procs[i] = null;
                     count++;
                 }
             }
@@ -300,15 +306,9 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                if (Procs[i].Pid == pid)
-                {
-                    PInfo p = Procs[i];
-                    p.IsWaited = isWaited;
-                    Procs[i] = p;
-                    return;
-                }
+                Procs[pid]!.IsWaited = isWaited;
             }
         }
     }
@@ -319,16 +319,13 @@ public static class PManager
 
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
-                if (Procs[i].Pid != pid) continue;
-
-                PInfo p = Procs[i];
+                PInfo p = Procs[pid]!;
                 if (p.State is PState.Zombie or PState.Terminated or PState.Failed)
                     return false;
 
                 p.KillReq = true;
-                Procs[i] = p;
                 return true;
             }
         }
@@ -339,8 +336,8 @@ public static class PManager
     {
         lock (Procs)
         {
-            for (int i = 0; i < Procs.Count; i++)
-                if (Procs[i].Pid == pid) return Procs[i].KillReq;
+            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
+                return Procs[pid]!.KillReq;
         }
         return false;
     }
@@ -359,37 +356,18 @@ public static class PManager
                 if (checkPid > 0 && IsKillReq(checkPid)) return false;
 
                 PInfo? p = Get(pid);
-                if (p == null)
-                {
-                    lock (Procs)
-                    {
-                        if (ReapedExitCodes.TryGetValue(pid, out int reapedCode))
-                        {
-                            exitCode = reapedCode;
-                            ReapedExitCodes.Remove(pid);
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                if (p.Value.ParentPid != parentPid) return false;
+                if (p == null) return false;
+                if (p.ParentPid != parentPid) return false;
 
-                if (p.Value.State == PState.Zombie)
+                if (p.State == PState.Zombie)
                     return Reap(parentPid, pid, out exitCode);
 
-                if (p.Value.State is PState.Terminated or PState.Failed)
+                if (p.State is PState.Terminated or PState.Failed)
                 {
-                    exitCode = p.Value.ExitCode != 0 ? p.Value.ExitCode : ErrCode;
+                    exitCode = p.ExitCode != 0 ? p.ExitCode : ErrCode;
                     lock (Procs)
                     {
-                        for (int i = 0; i < Procs.Count; i++)
-                        {
-                            if (Procs[i].Pid == pid)
-                            {
-                                Procs.RemoveAt(i);
-                                break;
-                            }
-                        }
+                        if (pid >= 0 && pid < MaxProcesses) Procs[pid] = null;
                     }
                     return true;
                 }

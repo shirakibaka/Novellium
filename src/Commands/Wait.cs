@@ -16,8 +16,6 @@ public static class Wait
             return;
         }
 
-        if (args[1] is "-h" or "--help") { Help(); return; }
-
         if (!int.TryParse(args[1], out int targetPid))
         {
             Output.WriteLine("wait: invalid pid", ConsoleColor.Red);
@@ -37,7 +35,7 @@ public static class Wait
             return;
         }
 
-        int parentPid = caller.Value.ParentPid;
+        int parentPid = caller.ParentPid;
         JManager.SetWaited(targetPid, true);
 
         try

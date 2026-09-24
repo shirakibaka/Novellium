@@ -9,7 +9,6 @@ public static class Ps
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
         PManager.List();
     }
 
