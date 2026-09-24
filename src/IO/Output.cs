@@ -1,6 +1,7 @@
 // Output.cs — Thread-safe console I/O and formatted diagnostic logging
 using System;
 using System.Text;
+using Novellium.Process;
 using Novellium.Services;
 
 namespace Novellium.IO;
@@ -11,29 +12,14 @@ public static class Output
     private static bool IsCapturing = false;
     private static readonly StringBuilder CapturedBuffer = new();
 
-    [ThreadStatic]
-    private static string? _threadStdin;
-
-    [ThreadStatic]
-    private static StringBuilder? _threadStdoutBuffer;
-
-    public static void SetStdin(string? input) => _threadStdin = input;
-    public static string GetStdin() => _threadStdin ?? string.Empty;
-
-    public static void StartRedirection()
+    public static string GetStdin()
     {
-        _threadStdoutBuffer = new StringBuilder();
+        lock (Lock)
+        {
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            return proc?.StdinText ?? string.Empty;
+        }
     }
-
-    public static string StopRedirection()
-    {
-        if (_threadStdoutBuffer == null) return string.Empty;
-        string res = _threadStdoutBuffer.ToString();
-        _threadStdoutBuffer = null;
-        return res;
-    }
-
-    public static bool IsRedirected => _threadStdoutBuffer != null;
 
     public static void StartCapture()
     {
@@ -82,7 +68,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null) _threadStdoutBuffer.Append(text);
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.Append(text);
             else if (IsCapturing) CapturedBuffer.Append(text);
             else Console.Write(text);
         }
@@ -92,7 +79,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine(text);
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine(text);
             else if (IsCapturing) CapturedBuffer.AppendLine(text);
             else Console.WriteLine(text);
         }
@@ -102,7 +90,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine();
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine();
             else if (IsCapturing) CapturedBuffer.AppendLine();
             else Console.WriteLine();
         }
@@ -112,7 +101,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null) _threadStdoutBuffer.Append(text);
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.Append(text);
             else if (IsCapturing) CapturedBuffer.Append(text);
             else
             {
@@ -128,7 +118,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null) _threadStdoutBuffer.AppendLine(text);
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine(text);
             else if (IsCapturing) CapturedBuffer.AppendLine(text);
             else
             {
@@ -149,7 +140,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer == null && !IsCapturing) Console.Clear();
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer == null && !IsCapturing) Console.Clear();
         }
     }
 
@@ -157,7 +149,8 @@ public static class Output
     {
         lock (Lock)
         {
-            if (_threadStdoutBuffer != null || IsCapturing)
+            PInfo? proc = PManager.Get(PManager.CurrentPid);
+            if (proc?.StdoutBuffer != null || IsCapturing)
             {
                 Write($"[{tag}] {text}\n");
                 return;

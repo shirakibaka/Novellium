@@ -1,4 +1,5 @@
 // Process.cs — PInfo: process metadata class
+using System.Text;
 using System.Threading;
 
 namespace Novellium.Process;
@@ -14,5 +15,7 @@ public class PInfo
     public bool IsWaited;
     public Thread? Thread;
     public string CurrentDirectory = "/";
+    public string StdinText = "";
+    public StringBuilder? StdoutBuffer;
     public string OutputBuffer = "";
 }

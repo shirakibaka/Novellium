@@ -1,6 +1,7 @@
 // Manager.cs — PManager: process, thread, signal, and orphan zombie management
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using Novellium.Commands;
 using Novellium.IO;
@@ -132,18 +133,19 @@ public static class PManager
             {
                 _currentThreadPid = pid;
                 SetState(pid, PState.Running);
-                if (stdinText != null) Output.SetStdin(stdinText);
-                if (captureStdout) Output.StartRedirection();
                 try
                 {
                     entry(pid, args);
                     if (captureStdout)
                     {
-                        string outBuf = Output.StopRedirection();
                         lock (Procs)
                         {
-                            if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
-                                Procs[pid]!.OutputBuffer = outBuf;
+                            PInfo? p = (pid >= 0 && pid < MaxProcesses) ? Procs[pid] : null;
+                            if (p?.StdoutBuffer != null)
+                            {
+                                p.OutputBuffer = p.StdoutBuffer.ToString();
+                                p.StdoutBuffer = null;
+                            }
                         }
                     }
                     if (Get(pid)?.State == PState.Running)
@@ -151,13 +153,8 @@ public static class PManager
                 }
                 catch (Exception ex)
                 {
-                    if (captureStdout) Output.StopRedirection();
                     OutputInfo.Error($"[PROCESS] PID: {pid} NAME: {name} error: {ex.Message}");
                     Exit(pid, ErrCode);
-                }
-                finally
-                {
-                    if (stdinText != null) Output.SetStdin(null);
                 }
             });
 
@@ -171,7 +168,9 @@ public static class PManager
                 KillReq = false,
                 IsWaited = isWaited,
                 Thread = thread,
-                CurrentDirectory = initialCwd
+                CurrentDirectory = initialCwd,
+                StdinText = stdinText ?? "",
+                StdoutBuffer = captureStdout ? new StringBuilder() : null
             };
         }
 

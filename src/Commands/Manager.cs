@@ -178,16 +178,24 @@ public static class CManager
         int pid = 0;
         if (entry.IsBuiltin)
         {
-            if (stdinText != null) Output.SetStdin(stdinText);
-            if (captureStdout) Output.StartRedirection();
+            PInfo? parentProc = PManager.Get(parentPid);
+            if (parentProc != null)
+            {
+                if (stdinText != null) parentProc.StdinText = stdinText;
+                if (captureStdout) parentProc.StdoutBuffer = new StringBuilder();
+            }
             try
             {
                 entry.Handler(parentPid, args);
-                if (captureStdout) capturedOut = Output.StopRedirection();
+                if (captureStdout && parentProc?.StdoutBuffer != null)
+                {
+                    capturedOut = parentProc.StdoutBuffer.ToString();
+                    parentProc.StdoutBuffer = null;
+                }
             }
             finally
             {
-                if (stdinText != null) Output.SetStdin(null);
+                if (parentProc != null) parentProc.StdinText = "";
             }
         }
         else
