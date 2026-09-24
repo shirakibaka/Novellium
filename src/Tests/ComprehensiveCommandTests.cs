@@ -74,7 +74,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestPaths()
     {
-        Output.WriteLine("--- Path Normalization & Resolution Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- Path Normalization & Resolution Tests ---", ConsoleColor.Yellow);
         Check(CManager.NormalizePath("/") == "/", "NormalizePath root '/'");
         Check(CManager.NormalizePath("/etc") == "/etc", "NormalizePath single dir '/etc'");
         Check(CManager.NormalizePath("///var///") == "/var", "NormalizePath multiple slashes '///var///'");
@@ -97,7 +97,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestCdPwd()
     {
-        Output.WriteLine("--- cd & pwd Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- cd & pwd Tests ---", ConsoleColor.Yellow);
         Check(Exec("cd") == 0 && CManager.CurrentDirectory == "/", "cd with no arguments resets CWD to '/'");
         Check(Exec("pwd") == 0, "pwd in '/' exits 0");
         Check(Exec("cd /etc") == 0 && CManager.CurrentDirectory == "/etc", "cd /etc sets CWD to '/etc'");
@@ -120,7 +120,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestTouch()
     {
-        Output.WriteLine("--- touch Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- touch Tests ---", ConsoleColor.Yellow);
         Check(Exec("touch") == 0, "touch without operands handles gracefully");
 
         string target = "/tmp/test_touch_single.txt";
@@ -148,7 +148,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestCat()
     {
-        Output.WriteLine("--- cat Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- cat Tests ---", ConsoleColor.Yellow);
         Check(Exec("cat /etc/hostname") == 0, "cat /etc/hostname succeeds");
         Check(Exec("cat /etc/hostname /etc/motd") == 0, "cat multiple files succeeds");
         Check(Exec("cat -n /etc/os-release") == 0, "cat -n succeeds");
@@ -165,7 +165,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestMkdir()
     {
-        Output.WriteLine("--- mkdir Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- mkdir Tests ---", ConsoleColor.Yellow);
         Check(Exec("mkdir") == 0, "mkdir without operands handles gracefully");
 
         string dir1 = "/tmp/test_mkdir_single";
@@ -193,7 +193,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestRm()
     {
-        Output.WriteLine("--- rm Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- rm Tests ---", ConsoleColor.Yellow);
         Check(Exec("rm") == 0, "rm without operands handles gracefully");
 
         string target = "/tmp/test_rm_single.txt";
@@ -218,7 +218,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestRmdir()
     {
-        Output.WriteLine("--- rmdir Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- rmdir Tests ---", ConsoleColor.Yellow);
         Check(Exec("rmdir") == 0, "rmdir without operands handles gracefully");
 
         string empty = "/tmp/test_rmdir_empty";
@@ -244,7 +244,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestStat()
     {
-        Output.WriteLine("--- stat Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- stat Tests ---", ConsoleColor.Yellow);
         Check(Exec("stat") == 0, "stat without operands handles gracefully");
         Check(Exec("stat /etc/hostname") == 0, "stat on regular file /etc/hostname succeeds");
         Check(Exec("stat /etc") == 0, "stat on directory /etc succeeds");
@@ -259,7 +259,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestDf()
     {
-        Output.WriteLine("--- df Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- df Tests ---", ConsoleColor.Yellow);
         Check(Exec("df") == 0, "df default executes and exits 0");
         Check(Exec("df -h") == 0, "df -h executes and exits 0");
         Check(Exec("df -k") == 0, "df -k executes and exits 0");
@@ -271,7 +271,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestUname()
     {
-        Output.WriteLine("--- uname Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- uname Tests ---", ConsoleColor.Yellow);
         string[] flags = ["", "-s", "-n", "-r", "-v", "-m", "-a", "-srm", "-snrvm"];
         bool all = true;
         foreach (string flag in flags)
@@ -286,7 +286,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestUptime()
     {
-        Output.WriteLine("--- uptime Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- uptime Tests ---", ConsoleColor.Yellow);
         Check(Exec("uptime") == 0, "uptime executes and exits 0");
         Check(Exec("uptime -p") == 0, "uptime -p executes and exits 0");
         Check(Exec("uptime -s") == 0, "uptime -s executes and exits 0");
@@ -296,7 +296,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestFree()
     {
-        Output.WriteLine("--- free Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- free Tests ---", ConsoleColor.Yellow);
         string[] cmds = ["free", "free -b", "free -k", "free -m", "free -h", "free --human", "free --mega"];
         bool all = true;
         foreach (string cmd in cmds)
@@ -310,7 +310,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestLifecycle()
     {
-        Output.WriteLine("--- End-To-End Developer Workflow Lifecycle ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- End-To-End Developer Workflow Lifecycle ---", ConsoleColor.Yellow);
         CManager.CurrentDirectory = "/";
         Check(CManager.CurrentDirectory == "/", "Workflow starts at '/'");
 
@@ -351,7 +351,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestBg()
     {
-        Output.WriteLine("--- Background Execution of Utilities (&) ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- Background Execution of Utilities (&) ---", ConsoleColor.Yellow);
         string bgFile = "/tmp/test_bg_touch.txt";
         VfsManager.TryUnlink(bgFile);
 
@@ -372,7 +372,7 @@ public static class ComprehensiveCommandTests
 
     private static void TestDmesg()
     {
-        Output.WriteLine("--- dmesg & syslog Integration Tests ---", ConsoleColor.Yellow);
+        Output.WriteDirectLine("--- dmesg & syslog Integration Tests ---", ConsoleColor.Yellow);
         Syslogd.Info("test_suite", "Comprehensive test suite entry 1");
         Syslogd.Warn("test_suite", "Comprehensive test suite entry 2");
         Syslogd.Error("test_suite", "Comprehensive test suite entry 3");
