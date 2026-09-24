@@ -33,13 +33,14 @@ public static class MainTest
 
     private static int Exec(string cmd)
     {
-        int pid = CManager.Execute(cmd, 1, out _);
+        int activePid = PManager.CurrentPid;
+        int pid = CManager.Execute(cmd, activePid, out _);
         if (pid == 0) return 0;
         if (pid < 0) return -1;
-        if (!PManager.Wait(1, pid, out int code, timeoutMs: 15000))
+        if (!PManager.Wait(activePid, pid, out int code, timeoutMs: 15000))
         {
             PManager.Kill(pid);
-            PManager.Wait(1, pid, out _);
+            PManager.Wait(activePid, pid, out _);
             return -1;
         }
         return code;
@@ -323,11 +324,12 @@ public static class MainTest
 
         Exec("cd ..");
         string bgApp = $"{ws}/build/app.bin";
-        int bgPid = CManager.Execute($"touch {bgApp} &", 1, out bool isBg);
+        int activePid = PManager.CurrentPid;
+        int bgPid = CManager.Execute($"touch {bgApp} &", activePid, out bool isBg);
         Check(isBg && bgPid > 0, "Spawn background build job (&)");
         Check(Exec("ps") == 0 && Exec("jobs") == 0, "Concurrent ps & jobs inspection");
 
-        bool waited = PManager.Wait(1, bgPid, out int code);
+        bool waited = PManager.Wait(activePid, bgPid, out int code);
         Check(waited && code == 0 && VfsManager.TryStat(bgApp, out _), "Background build finished (exit 0)");
 
         Check(Exec("dmesg") == 0, "dmesg & syslog inspection");
