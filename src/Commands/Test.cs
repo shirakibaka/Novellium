@@ -11,30 +11,13 @@ public static class Test
     {
         if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
 
-        string suite = args.Length > 1 ? args[1].ToLower() : "all";
-        switch (suite)
-        {
-            case "commands" or "cmd":
-                ComprehensiveCommandTests.Run();
-                break;
-            case "process" or "proc":
-                ProcessTests.Run();
-                break;
-            default:
-                CommandTests.Run();
-                break;
-        }
+        MainTest.Run();
     }
 
     public static void Help()
     {
-        Output.WriteLine("Usage: test [SUITE]", ConsoleColor.White);
-        Output.WriteLine("Run kernel automated test suites.", ConsoleColor.Gray);
-        Output.WriteLine();
-        Output.WriteLine("Suites:", ConsoleColor.White);
-        Output.WriteLine("  all        run all command and comprehensive tests (default)", ConsoleColor.Gray);
-        Output.WriteLine("  commands   run comprehensive filesystem & commands suite", ConsoleColor.Gray);
-        Output.WriteLine("  process    run process manager test suite", ConsoleColor.Gray);
+        Output.WriteLine("Usage: test", ConsoleColor.White);
+        Output.WriteLine("Run Novellium unified master integration test suite.", ConsoleColor.Gray);
         Output.WriteLine();
         Output.WriteLine("Options:", ConsoleColor.White);
         Output.WriteLine("  -h, --help display this help and exit", ConsoleColor.Gray);
