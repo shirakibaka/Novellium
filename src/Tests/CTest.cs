@@ -13,6 +13,18 @@ public static class CommandTests
 {
     private static int Passed, Failed;
     private static readonly List<string> FailedTests = new();
+    private static TestBlock? CurBlock;
+
+    private class TestBlock
+    {
+        public string Title { get; }
+        public List<(bool Passed, string Name)> Items { get; } = new();
+
+        public TestBlock(string title)
+        {
+            Title = title;
+        }
+    }
 
     private static int Exec(string cmd)
     {
@@ -32,24 +44,32 @@ public static class CommandTests
         Passed = 0; Failed = 0; FailedTests.Clear();
         Output.WriteDirectLine("=== COMMAND TESTS ===", ConsoleColor.Cyan);
 
+        List<TestBlock> blocks = new();
         Output.StartCapture();
         try
         {
-            TestUnknownCommand();
-            TestForeground();
-            TestBackground();
-            TestLsCommand();
-            TestFilesystemCommands();
-            TestSystemInfoCommands();
-            TestHelpCommand();
-            TestCommandHelpFlags();
-            TestDmesgCommand();
-            TestSyslogd();
-            TestClearCommand();
+            blocks.Add(TestUnknownCommand());
+            blocks.Add(TestForeground());
+            blocks.Add(TestBackground());
+            blocks.Add(TestLsCommand());
+            blocks.Add(TestFilesystemCommands());
+            blocks.Add(TestSystemInfoCommands());
+            blocks.Add(TestHelpCommand());
+            blocks.Add(TestCommandHelpFlags());
+            blocks.Add(TestDmesgAndSyslog());
+            blocks.Add(TestClearCommand());
         }
         finally
         {
             Output.StopCapture();
+        }
+
+        Output.WriteDirectLine();
+        for (int i = 0; i < blocks.Count; i += 2)
+        {
+            TestBlock left = blocks[i];
+            TestBlock? right = i + 1 < blocks.Count ? blocks[i + 1] : null;
+            PrintBlockPair(left, right);
         }
 
         ComprehensiveCommandTests.Run();
@@ -68,15 +88,71 @@ public static class CommandTests
         Output.WriteDirectLine();
     }
 
-    private static void TestUnknownCommand()
+    private static string PadOrTruncate(string str, int width)
     {
+        if (str.Length > width) return str.Substring(0, width - 3) + "...";
+        return str.PadRight(width);
+    }
+
+    private static void PrintBlockPair(TestBlock left, TestBlock? right)
+    {
+        const int width = 38;
+        int maxItems = Math.Max(left.Items.Count, right?.Items.Count ?? 0);
+
+        string leftHdr = PadOrTruncate($"--- {left.Title} ---", width);
+        string rightHdr = right != null ? PadOrTruncate($"--- {right.Title} ---", width) : "";
+
+        Output.Write(leftHdr, ConsoleColor.Yellow);
+        Output.Write("   ");
+        Output.WriteLine(rightHdr, ConsoleColor.Yellow);
+
+        for (int i = 0; i < maxItems; i++)
+        {
+            if (i < left.Items.Count)
+            {
+                var (passed, name) = left.Items[i];
+                Output.Write("[", ConsoleColor.White);
+                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.Write("] ", ConsoleColor.White);
+                Output.Write(PadOrTruncate(name, width - 7));
+            }
+            else
+            {
+                Output.Write(new string(' ', width));
+            }
+
+            Output.Write("   ");
+
+            if (right != null && i < right.Items.Count)
+            {
+                var (passed, name) = right.Items[i];
+                Output.Write("[", ConsoleColor.White);
+                Output.Write(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.Write("] ", ConsoleColor.White);
+                Output.WriteLine(PadOrTruncate(name, width - 7));
+            }
+            else
+            {
+                Output.WriteLine();
+            }
+        }
+        Output.WriteLine();
+    }
+
+    private static TestBlock TestUnknownCommand()
+    {
+        TestBlock block = new("Unknown Command Tests");
+        CurBlock = block;
         int pid = CManager.Execute("doesnotexist", 1, out bool bg);
         Check(pid == 0, "unknown command");
         Check(!bg, "unknown command is not background");
+        return block;
     }
 
-    private static void TestForeground()
+    private static TestBlock TestForeground()
     {
+        TestBlock block = new("Foreground Process Tests");
+        CurBlock = block;
         int pid = CManager.Execute("sleep 0", 1, out bool bg);
         Check(pid > 0, "foreground command returns PID");
         Check(!bg, "foreground command detected");
@@ -85,10 +161,13 @@ public static class CommandTests
         Check(waited, "foreground command waits");
         Check(exitCode == 0, "foreground command exits with code 0");
         Check(PManager.Get(pid) == null, "foreground process is reaped");
+        return block;
     }
 
-    private static void TestBackground()
+    private static TestBlock TestBackground()
     {
+        TestBlock block = new("Background Process Tests");
+        CurBlock = block;
         int pid = CManager.Execute("sleep 0 &", 1, out bool bg);
         Check(pid > 0, "background command returns PID");
         Check(bg, "background command detected");
@@ -116,10 +195,13 @@ public static class CommandTests
         Check(waited, "background process can be waited");
         Check(exitCode == 0, "background process exits with code 0");
         Check(PManager.Get(pid) == null, "background process is reaped");
+        return block;
     }
 
-    private static void TestLsCommand()
+    private static TestBlock TestLsCommand()
     {
+        TestBlock block = new("ls Command Tests");
+        CurBlock = block;
         int pid = CManager.Execute("ls", 1, out bool bg);
         Check(pid > 0 && !bg, "ls command executes");
         PManager.Wait(1, pid, out int code);
@@ -130,10 +212,13 @@ public static class CommandTests
         Check(Exec("ls -1 /tmp") == 0, "ls -1 /tmp executes");
         Check(Exec("ls --help") == 0, "ls --help executes");
         Check(Exec("ls -z") >= 0, "ls -z executes");
+        return block;
     }
 
-    private static void TestFilesystemCommands()
+    private static TestBlock TestFilesystemCommands()
     {
+        TestBlock block = new("Filesystem Commands Tests");
+        CurBlock = block;
         Check(Exec("pwd") == 0, "pwd command executes");
         Check(Exec("touch /tmp/ctest.txt") == 0, "touch command executes");
         Check(Exec("stat /tmp/ctest.txt") == 0, "stat command executes");
@@ -145,17 +230,23 @@ public static class CommandTests
         Check(Exec("rm /tmp/ctest.txt") == 0, "rm command executes");
         Check(Exec("rmdir /tmp/testdir/sub") == 0, "rmdir command executes");
         Check(Exec("df -h") == 0, "df command executes");
+        return block;
     }
 
-    private static void TestSystemInfoCommands()
+    private static TestBlock TestSystemInfoCommands()
     {
+        TestBlock block = new("System Info Commands Tests");
+        CurBlock = block;
         Check(Exec("uname -a") == 0, "uname command executes");
         Check(Exec("uptime") == 0, "uptime command executes");
         Check(Exec("free -m") == 0, "free command executes");
+        return block;
     }
 
-    private static void TestHelpCommand()
+    private static TestBlock TestHelpCommand()
     {
+        TestBlock block = new("help Command Tests");
+        CurBlock = block;
         int pid = CManager.Execute("help", 1, out bool bg);
         Check(pid > 0 && !bg, "help command executes");
         PManager.Wait(1, pid, out int code);
@@ -172,10 +263,13 @@ public static class CommandTests
         int unkPid = CManager.Execute("help nonexistenttopic", 1, out _);
         Check(unkPid > 0, "help unknown topic executes");
         PManager.Wait(1, unkPid, out _);
+        return block;
     }
 
-    private static void TestCommandHelpFlags()
+    private static TestBlock TestCommandHelpFlags()
     {
+        TestBlock block = new("Command Help Flags Tests");
+        CurBlock = block;
         string[] commands = [
             "ps --help", "jobs -h", "kill --help", "wait -h", "sleep --help",
             "dmesg -h", "cat --help", "cd -h", "pwd --help", "touch -h",
@@ -188,34 +282,38 @@ public static class CommandTests
             if (Exec(cmd) != 0) { allOk = false; break; }
         }
         Check(allOk, "all commands support -h/--help flags");
+        return block;
     }
 
-    private static void TestDmesgCommand()
+    private static TestBlock TestDmesgAndSyslog()
     {
+        TestBlock block = new("dmesg & syslog Tests");
+        CurBlock = block;
         int pid = CManager.Execute("dmesg", 1, out bool bg);
         Check(pid > 0 && !bg, "dmesg command executes");
         PManager.Wait(1, pid, out int code);
         Check(code == 0, "dmesg exits with 0");
         Check(Exec("dmesg -h") == 0, "dmesg -h executes");
-    }
 
-    private static void TestSyslogd()
-    {
         Syslogd.Info("test", "test syslogd log entry");
         var recent = Syslogd.GetRecentLogs();
         Check(recent.Count > 0, "syslogd buffer captures log entry");
 
-        int pid = Syslogd.Start();
-        Check(pid > 0, "syslogd daemon started");
+        int sysPid = Syslogd.Start();
+        Check(sysPid > 0, "syslogd daemon started");
+        return block;
     }
 
-    private static void TestClearCommand()
+    private static TestBlock TestClearCommand()
     {
+        TestBlock block = new("clear Command Tests");
+        CurBlock = block;
         int pid = CManager.Execute("clear", 1, out bool bg);
         Check(pid > 0 && !bg, "clear command executes");
         PManager.Wait(1, pid, out int code);
         Check(code == 0, "clear exits with 0");
         Check(Exec("clear --help") == 0, "clear --help executes");
+        return block;
     }
 
     private static void Check(bool cond, string name)
@@ -223,13 +321,13 @@ public static class CommandTests
         if (cond)
         {
             Passed++;
-            OutputInfo.Test(true, name);
+            CurBlock?.Items.Add((true, name));
         }
         else
         {
             Failed++;
             FailedTests.Add(name);
-            OutputInfo.Test(false, name);
+            CurBlock?.Items.Add((false, name));
         }
     }
 }

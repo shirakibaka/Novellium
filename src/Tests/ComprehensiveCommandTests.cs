@@ -107,7 +107,7 @@ public static class ComprehensiveCommandTests
         string rightHdr = right != null ? PadOrTruncate($"--- {right.Title} ---", width) : "";
 
         Output.Write(leftHdr, ConsoleColor.Yellow);
-        Output.Write(" | ", ConsoleColor.DarkGray);
+        Output.Write("   ");
         Output.WriteLine(rightHdr, ConsoleColor.Yellow);
 
         for (int i = 0; i < maxItems; i++)
@@ -125,7 +125,7 @@ public static class ComprehensiveCommandTests
                 Output.Write(new string(' ', width));
             }
 
-            Output.Write(" | ", ConsoleColor.DarkGray);
+            Output.Write("   ");
 
             if (right != null && i < right.Items.Count)
             {
