@@ -9,6 +9,7 @@ output-x64/
 
 # Disk & Storage Images
 512
+disk
 *.img
 !disk.img.gz
 *.vmdk

@@ -86,57 +86,84 @@ public static class Ls
             return;
         }
 
-        if (!VfsManager.TryOpenDirectory(path, out var dir) || dir == null)
+        IReadOnlyList<IVfsInode>? entries = null;
+        if (VfsManager.TryOpenDirectory(path, out var dir) && dir != null)
+        {
+            using (dir)
+            {
+                dir.TryReadDir(out entries);
+            }
+        }
+        else
         {
             Output.WriteLine($"ls: cannot open directory '{orig}'", ConsoleColor.Red);
             return;
         }
 
-        using (dir)
+        if (entries == null)
         {
-            if (!dir.TryReadDir(out var entries) || entries == null)
+            Output.WriteLine($"ls: failed to read directory '{orig}'", ConsoleColor.Red);
+            return;
+        }
+
+        List<Entry> list = new();
+        foreach (var e in entries)
+        {
+            if (e == null || string.IsNullOrEmpty(e.Name)) continue;
+            if (!showAll && e.Name.StartsWith('.')) continue;
+
+            VfsStat st = default;
+            if (e.Name == ".")
             {
-                Output.WriteLine($"ls: failed to read directory '{orig}'", ConsoleColor.Red);
-                return;
+                st = targetStat;
             }
-
-            List<Entry> list = new();
-            foreach (var e in entries)
+            else if (e.Name == "..")
             {
-                if (e == null || string.IsNullOrEmpty(e.Name)) continue;
-                if (!showAll && e.Name.StartsWith('.')) continue;
-
-                string child = path == "/" ? "/" + e.Name : path + "/" + e.Name;
-                VfsStat st = default;
-                if (e.InodeOperations != null && e.InodeOperations.GetAttr(e, out st)) { }
-                else VfsManager.TryStat(child, out st);
-
-                list.Add(new Entry { Name = e.Name, Stat = st });
-            }
-
-            list.Sort((x, y) => string.Compare(x.Name, y.Name, StringComparison.OrdinalIgnoreCase));
-
-            if (longFmt)
-            {
-                foreach (var item in list) Print(item.Name, item.Stat, true);
-            }
-            else if (onePerLine)
-            {
-                foreach (var item in list)
-                {
-                    PrintName(item.Name, item.Stat);
-                    Output.WriteLine();
-                }
+                string parentPath = CManager.NormalizePath(path + "/..");
+                if (!VfsManager.TryStat(parentPath, out st)) st = default;
             }
             else
             {
-                for (int i = 0; i < list.Count; i++)
-                {
-                    PrintName(list[i].Name, list[i].Stat);
-                    if (i < list.Count - 1) Output.Write("  ");
-                }
-                if (list.Count > 0) Output.WriteLine();
+                string child = path == "/" ? "/" + e.Name : path + "/" + e.Name;
+                if (e.InodeOperations != null && e.InodeOperations.GetAttr(e, out st)) { }
+                else if (!VfsManager.TryStat(child, out st)) st = default;
             }
+
+            list.Add(new Entry { Name = e.Name, Stat = st });
+        }
+
+        // Stable ordinal sort without delegate/reflection overhead in NativeAOT
+        for (int i = 0; i < list.Count - 1; i++)
+        {
+            for (int j = 0; j < list.Count - 1 - i; j++)
+            {
+                if (string.CompareOrdinal(list[j].Name, list[j + 1].Name) > 0)
+                {
+                    (list[j], list[j + 1]) = (list[j + 1], list[j]);
+                }
+            }
+        }
+
+        if (longFmt)
+        {
+            foreach (var item in list) Print(item.Name, item.Stat, true);
+        }
+        else if (onePerLine)
+        {
+            foreach (var item in list)
+            {
+                PrintName(item.Name, item.Stat);
+                Output.WriteLine();
+            }
+        }
+        else
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                PrintName(list[i].Name, list[i].Stat);
+                if (i < list.Count - 1) Output.Write("  ");
+            }
+            if (list.Count > 0) Output.WriteLine();
         }
     }
 

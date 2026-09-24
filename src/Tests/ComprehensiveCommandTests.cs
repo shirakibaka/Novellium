@@ -19,7 +19,12 @@ public static class ComprehensiveCommandTests
     {
         int pid = CManager.Execute(cmd, 1, out _);
         if (pid <= 0) return -1;
-        PManager.Wait(1, pid, out int code);
+        if (!PManager.Wait(1, pid, out int code, timeoutMs: 15000))
+        {
+            PManager.Kill(pid);
+            PManager.Wait(1, pid, out _);
+            return -1;
+        }
         return code;
     }
 
