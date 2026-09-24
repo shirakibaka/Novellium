@@ -82,8 +82,8 @@
       "dependsOn": "Build x64",
       "command": "qemu-system-x86_64",
       "args": [
-        "-M", "q35",
-        "-cpu", "max",
+        "-M", "pc",
+        "-cpu", "qemu64",
         "-m", "512M",
         "-serial", "stdio",
         "-cdrom", "${workspaceFolder}/output-x64/Novellium.iso",
@@ -128,7 +128,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "qemu-system-x86_64 -M q35 -cpu max -m 512M -serial stdio -cdrom ${workspaceFolder}/output-x64/Novellium.iso -vga std -s -S -no-reboot -no-shutdown & sleep 1 && echo QEMU-DEBUG-READY && wait"
+        "qemu-system-x86_64 -M pc -cpu qemu64 -m 512M -serial stdio -cdrom ${workspaceFolder}/output-x64/Novellium.iso -vga std -s -S -no-reboot -no-shutdown & sleep 1 && echo QEMU-DEBUG-READY && wait"
       ],
       "isBackground": true,
       "problemMatcher": {
