@@ -102,9 +102,9 @@ public static class Init
         MakeDir("/usr", (VfsMode)493);
 
         MakeFile("/etc/hostname", "novellium\n");
-        MakeFile("/etc/os-release", "NAME=Novellium\nID=novellium\nVERSION=\"0.1.0\"\nPRETTY_NAME=\"Novellium OS\"\n");
+        MakeFile("/etc/os-release", "NAME=Novellium\nID=novellium\nVERSION=\"0.1.0\"\nPRETTY_NAME=\"Novellium\"\n");
         MakeFile("/etc/motd", "Welcome to Novellium!\n");
-        MakeFile("/etc/version", "Novellium 0.1.0 (Cosmos Gen3 / Limine)\n");
+        MakeFile("/etc/version", "0.1.0 (Cosmos 3.0.88 / Limine 8.0.2)\n");
 
         OutputInfo.Ok("Root filesystem structure initialized.");
     }

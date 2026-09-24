@@ -51,7 +51,7 @@ public static class MainTest
     public static void Run()
     {
         Passed = 0; Failed = 0; FailedTests.Clear();
-        Output.WriteDirectLine("Running Novellium Test Suite...", ConsoleColor.Cyan);
+        Output.WriteDirectLine("Running Novellium Test Suite...", ConsoleColor.White);
 
         string oldCwd = CManager.CurrentDirectory;
         bool prevAutoReap = PManager.AutomaticOrphanReaping;
@@ -147,19 +147,19 @@ public static class MainTest
         {
             icon = "v";
             iconColor = ConsoleColor.Green;
-            compText = $"Suite: {b.Title} ({passedCount} tests passed)";
+            compText = $"{b.Title} ({passedCount} tests passed)";
         }
         else if (passedCount > 0)
         {
             icon = "v";
             iconColor = ConsoleColor.Yellow;
-            compText = $"Suite: {b.Title} ({passedCount}/{b.Items.Count} passed)";
+            compText = $"{b.Title} ({passedCount}/{b.Items.Count} passed)";
         }
         else
         {
             icon = "x";
             iconColor = ConsoleColor.Red;
-            compText = $"Suite: {b.Title} ({failedCount} tests failed)";
+            compText = $"{b.Title} ({failedCount} tests failed)";
         }
 
         int pad = Math.Max(0, LastLineLen - compText.Length);
@@ -181,7 +181,7 @@ public static class MainTest
                 Output.WriteDirect("[", ConsoleColor.White);
                 Output.WriteDirect(passed ? "v" : "x", passed ? ConsoleColor.Green : ConsoleColor.Red);
                 Output.WriteDirect("] ", ConsoleColor.White);
-                Output.WriteDirectLine(name, passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.WriteDirectLine(name, passed ? ConsoleColor.White : ConsoleColor.White);
             }
         }
 
@@ -293,6 +293,9 @@ public static class MainTest
         string old = CManager.CurrentDirectory;
         CManager.CurrentDirectory = "/";
         Check(CManager.ResolvePath("") == "/", "ResolvePath empty returns CWD");
+
+        string[] qArgs = CManager.SplitArgs("echo \"hello world\" 'foo bar'");
+        Check(qArgs.Length == 3 && qArgs[1] == "hello world" && qArgs[2] == "foo bar", "SplitArgs quoted string parsing");
         Check(CManager.ResolvePath("file.txt") == "/file.txt", "ResolvePath relative at '/'");
         Check(CManager.ResolvePath("/absolute/path") == "/absolute/path", "ResolvePath absolute remains absolute");
 

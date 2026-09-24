@@ -85,23 +85,37 @@ public static class CManager
         var args = new List<string>();
         var current = new StringBuilder();
         bool inDouble = false, inSingle = false;
+        bool tokenActive = false;
 
         for (int i = 0; i < input.Length; i++)
         {
             char c = input[i];
-            if (c == '"' && !inSingle) inDouble = !inDouble;
-            else if (c == '\'' && !inDouble) inSingle = !inSingle;
+            if (c == '"' && !inSingle)
+            {
+                inDouble = !inDouble;
+                tokenActive = true;
+            }
+            else if (c == '\'' && !inDouble)
+            {
+                inSingle = !inSingle;
+                tokenActive = true;
+            }
             else if (char.IsWhiteSpace(c) && !inDouble && !inSingle)
             {
-                if (current.Length > 0)
+                if (tokenActive)
                 {
                     args.Add(current.ToString());
                     current.Clear();
+                    tokenActive = false;
                 }
             }
-            else current.Append(c);
+            else
+            {
+                current.Append(c);
+                tokenActive = true;
+            }
         }
-        if (current.Length > 0) args.Add(current.ToString());
+        if (tokenActive) args.Add(current.ToString());
         return args.ToArray();
     }
 
