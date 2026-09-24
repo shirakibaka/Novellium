@@ -13,4 +13,5 @@ public struct PInfo
     public bool KillReq;
     public bool IsWaited;
     public Thread? Thread;
+    public string CurrentDirectory;
 }

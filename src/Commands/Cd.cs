@@ -3,6 +3,7 @@ using System;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -24,7 +25,9 @@ public static class Cd
             return;
         }
 
-        CManager.CurrentDirectory = target;
+        PManager.SetCwd(pid, target);
+        int parentPid = PManager.GetParentPid(pid);
+        if (parentPid > 0) PManager.SetCwd(parentPid, target);
     }
 
     public static void Help()

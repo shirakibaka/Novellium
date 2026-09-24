@@ -20,6 +20,49 @@ public static class PManager
     internal static bool SimulateThreadStartFailure = false;
     public static bool AutomaticOrphanReaping { get; set; } = true;
 
+    [ThreadStatic]
+    private static int _currentThreadPid;
+
+    public static int CurrentPid => _currentThreadPid != 0 ? _currentThreadPid : KernelPid;
+
+    public static string GetCwd(int pid)
+    {
+        lock (Procs)
+        {
+            for (int i = 0; i < Procs.Count; i++)
+                if (Procs[i].Pid == pid) return string.IsNullOrEmpty(Procs[i].CurrentDirectory) ? "/" : Procs[i].CurrentDirectory;
+        }
+        return "/";
+    }
+
+    public static bool SetCwd(int pid, string cwd)
+    {
+        lock (Procs)
+        {
+            for (int i = 0; i < Procs.Count; i++)
+            {
+                if (Procs[i].Pid == pid)
+                {
+                    PInfo p = Procs[i];
+                    p.CurrentDirectory = cwd;
+                    Procs[i] = p;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static int GetParentPid(int pid)
+    {
+        lock (Procs)
+        {
+            for (int i = 0; i < Procs.Count; i++)
+                if (Procs[i].Pid == pid) return Procs[i].ParentPid;
+        }
+        return 0;
+    }
+
     public static bool Initialize()
     {
         lock (Procs)
@@ -36,7 +79,8 @@ public static class PManager
                 ExitCode = 0,
                 KillReq = false,
                 IsWaited = false,
-                Thread = null
+                Thread = null,
+                CurrentDirectory = "/"
             });
         }
         return true;
@@ -50,8 +94,11 @@ public static class PManager
         lock (Procs)
         {
             pid = NextPid++;
+            string initialCwd = GetCwd(parentPid);
+
             thread = new(() =>
             {
+                _currentThreadPid = pid;
                 SetState(pid, PState.Running);
                 try
                 {
@@ -74,7 +121,8 @@ public static class PManager
                 ExitCode = 0,
                 KillReq = false,
                 IsWaited = isWaited,
-                Thread = thread
+                Thread = thread,
+                CurrentDirectory = initialCwd
             });
         }
 

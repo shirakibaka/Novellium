@@ -223,6 +223,10 @@ public static class MainTest
         Thread.Sleep(5);
         Check(PManager.ReapOrphans(true) >= 1, "Orphan zombie reaping");
 
+        int subCwdPid = PManager.Start("test-cwd-sub", [], (pid, args) => { PManager.SetCwd(pid, "/tmp"); }, 1);
+        PManager.Wait(1, subCwdPid, out _);
+        Check(PManager.GetCwd(1) == "/", "Per-process CWD isolation");
+
         PInfo? kInfo = PManager.Get(1);
         Check(kInfo != null && kInfo.Value.Name == "kernel", "Thread instance tracking");
 

@@ -8,7 +8,11 @@ namespace Novellium.Commands;
 
 public static class CManager
 {
-    public static string CurrentDirectory { get; set; } = "/";
+    public static string CurrentDirectory
+    {
+        get => PManager.GetCwd(PManager.CurrentPid);
+        set => PManager.SetCwd(PManager.CurrentPid, value);
+    }
 
     public static string ResolvePath(string path)
     {
