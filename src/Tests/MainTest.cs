@@ -86,12 +86,24 @@ public static class MainTest
         Output.WriteDirectLine();
         if (Failed == 0)
         {
-            Output.WriteDirectLine($"MASTER SUITE RESULT: All {Passed} tests passed successfully!", ConsoleColor.Green);
+            Output.WriteDirect("Test suite result: ", ConsoleColor.White);
+            Output.WriteDirect($"{Passed} passed", ConsoleColor.Green);
+            Output.WriteDirectLine(", 0 failed.", ConsoleColor.White);
         }
         else
         {
-            Output.WriteDirectLine($"MASTER SUITE RESULT: {Passed} passed, {Failed} failed!", ConsoleColor.Red);
-            foreach (string f in FailedTests) Output.WriteDirectLine($"  - {f}", ConsoleColor.Red);
+            Output.WriteDirect("Test suite result: ", ConsoleColor.White);
+            Output.WriteDirect($"{Passed} passed", ConsoleColor.Green);
+            Output.WriteDirect(", ", ConsoleColor.White);
+            Output.WriteDirect($"{Failed} failed", ConsoleColor.Red);
+            Output.WriteDirectLine(".", ConsoleColor.White);
+
+            Output.WriteDirectLine("Failed tests:", ConsoleColor.White);
+            foreach (string f in FailedTests)
+            {
+                Output.WriteDirect("  - ", ConsoleColor.White);
+                Output.WriteDirectLine(f, ConsoleColor.Red);
+            }
         }
         Output.WriteDirectLine();
     }
@@ -119,18 +131,59 @@ public static class MainTest
             b.Items.Add((false, $"Suite exception: {ex.Message}"));
         }
 
-        bool allPassed = true;
-        foreach (var item in b.Items) if (!item.Passed) allPassed = false;
+        int passedCount = 0;
+        int failedCount = 0;
+        foreach (var item in b.Items)
+        {
+            if (item.Passed) passedCount++;
+            else failedCount++;
+        }
 
-        string compText = allPassed
-            ? $"Completed suite: {b.Title} ({b.Items.Count} tests)"
-            : $"Failed suite: {b.Title} ({b.Items.Count} tests)";
+        string icon;
+        ConsoleColor iconColor;
+        string compText;
+
+        if (failedCount == 0)
+        {
+            icon = "v";
+            iconColor = ConsoleColor.Green;
+            compText = $"Suite: {b.Title} ({passedCount} tests passed)";
+        }
+        else if (passedCount > 0)
+        {
+            icon = "v";
+            iconColor = ConsoleColor.Yellow;
+            compText = $"Suite: {b.Title} ({passedCount}/{b.Items.Count} passed)";
+        }
+        else
+        {
+            icon = "x";
+            iconColor = ConsoleColor.Red;
+            compText = $"Suite: {b.Title} ({failedCount} tests failed)";
+        }
+
         int pad = Math.Max(0, LastLineLen - compText.Length);
-
         Output.WriteDirect("\r  [", ConsoleColor.White);
-        Output.WriteDirect(allPassed ? "v" : "x", allPassed ? ConsoleColor.Green : ConsoleColor.Red);
+        Output.WriteDirect(icon, iconColor);
         Output.WriteDirect("] ", ConsoleColor.White);
-        Output.WriteDirectLine(compText + new string(' ', pad), allPassed ? ConsoleColor.White : ConsoleColor.Red);
+        Output.WriteDirectLine(compText + new string(' ', pad), ConsoleColor.White);
+
+        if (failedCount > 0)
+        {
+            for (int i = 0; i < b.Items.Count; i++)
+            {
+                bool isLast = (i == b.Items.Count - 1);
+                var (passed, name) = b.Items[i];
+                string connector = isLast ? "`-- " : "|-- ";
+
+                Output.WriteDirect("     ", ConsoleColor.White);
+                Output.WriteDirect(connector, ConsoleColor.Gray);
+                Output.WriteDirect("[", ConsoleColor.White);
+                Output.WriteDirect(passed ? "v" : "x", passed ? ConsoleColor.Green : ConsoleColor.Red);
+                Output.WriteDirect("] ", ConsoleColor.White);
+                Output.WriteDirectLine(name, passed ? ConsoleColor.Green : ConsoleColor.Red);
+            }
+        }
 
         return b;
     }
