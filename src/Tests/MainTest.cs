@@ -74,6 +74,7 @@ public static class MainTest
             blocks.Add(RunBlock("System Info & Utilities", TestSystemInfoUtilities));
             blocks.Add(RunBlock("Unix Utilities & Redirection", TestUnixCoreutilsAndRedirection));
             blocks.Add(RunBlock("find & tree Commands", TestFindAndTreeCommands));
+            blocks.Add(RunBlock("cp & mv Commands", TestCpAndMvCommands));
         }
         finally
         {
@@ -470,27 +471,28 @@ public static class MainTest
         Check(Exec("dmesg") == 0 && Exec("dmesg -h") == 0, "dmesg & dmesg -h");
         Check(Exec("clear") == 0 && Exec("clear --help") == 0, "clear & clear --help");
 
-        string[] topics = ["ls", "cat", "cd", "pwd", "touch", "mkdir", "rm", "rmdir", "df", "stat", "uname", "uptime", "free", "ps", "jobs", "kill", "wait", "sleep", "help", "dmesg", "clear", "test", "find", "tree"];
+        string[] topics = ["ls", "cat", "cd", "pwd", "touch", "mkdir", "rm", "rmdir", "df", "stat", "uname", "uptime", "free", "ps", "jobs", "kill", "wait", "sleep", "help", "dmesg", "clear", "test", "find", "tree", "cp", "mv"];
         bool helpOk = true;
         foreach (string t in topics)
         {
             if (Exec($"help {t}") != 0) { helpOk = false; break; }
         }
-        Check(helpOk, "help builtin topics (24)");
+        Check(helpOk, "help builtin topics (26)");
 
         string[] cmdHelps = [
             "ps --help", "jobs -h", "kill --help", "wait -h", "sleep --help",
             "dmesg -h", "cat --help", "cd -h", "pwd --help", "touch -h",
             "mkdir --help", "rm -h", "rmdir --help", "stat --help", "uname -h",
             "uptime --help", "free -h", "clear -h", "clear --help", "test -h", "test --help",
-            "find --help", "find -h", "tree --help", "tree -h"
+            "find --help", "find -h", "tree --help", "tree -h",
+            "cp --help", "cp -h", "mv --help", "mv -h"
         ];
         bool flagsOk = true;
         foreach (string c in cmdHelps)
         {
             if (Exec(c) != 0) { flagsOk = false; break; }
         }
-        Check(flagsOk, "Universal -h/--help flags (25)");
+        Check(flagsOk, "Universal -h/--help flags (29)");
 
         return block;
     }
@@ -553,6 +555,34 @@ public static class MainTest
         Check(Exec($"tree {tDir} -d") == 0, "tree -d directories only");
 
         Directory.Delete(tDir, true);
+        return block;
+    }
+
+    private static TestBlock TestCpAndMvCommands()
+    {
+        TestBlock block = new("cp & mv Commands");
+        CurBlock = block;
+
+        string cDir = "/tmp/cpmv_test";
+        if (Directory.Exists(cDir)) Directory.Delete(cDir, true);
+        Directory.CreateDirectory($"{cDir}/src_dir");
+
+        string srcFile = $"{cDir}/src_dir/orig.txt";
+        File.WriteAllText(srcFile, "Cp Mv Content");
+
+        string copyFile = $"{cDir}/src_dir/copy.txt";
+        Check(Exec($"cp {srcFile} {copyFile}") == 0 && File.Exists(copyFile) && File.ReadAllText(copyFile) == "Cp Mv Content", "cp single file");
+
+        string backupDir = $"{cDir}/backup";
+        Check(Exec($"cp -r {cDir}/src_dir {backupDir}") == 0 && Directory.Exists(backupDir) && File.Exists($"{backupDir}/orig.txt"), "cp -r directory copy");
+
+        string movedFile = $"{cDir}/src_dir/moved.txt";
+        Check(Exec($"mv {copyFile} {movedFile}") == 0 && !File.Exists(copyFile) && File.Exists(movedFile), "mv rename file");
+
+        string movedDir = $"{cDir}/moved_backup";
+        Check(Exec($"mv {backupDir} {movedDir}") == 0 && !Directory.Exists(backupDir) && Directory.Exists(movedDir), "mv directory move");
+
+        Directory.Delete(cDir, true);
         return block;
     }
 
