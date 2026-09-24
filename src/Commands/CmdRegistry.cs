@@ -58,6 +58,8 @@ public static class CmdRegistry
         Register(new CmdEntry("tail", "tail [-n NUM] [file]...", "output the last part of files", Tail.Run, Tail.Help));
         Register(new CmdEntry("wc", "wc [-l|-w|-c] [file]...", "print line, word, and byte counts", Wc.Run, Wc.Help));
         Register(new CmdEntry("tee", "tee [-a] [file]...", "read from standard input and write to standard output and files", Tee.Run, Tee.Help));
+        Register(new CmdEntry("find", "find [path] [options]", "search for files in a directory hierarchy", Find.Run, Find.Help));
+        Register(new CmdEntry("tree", "tree [path] [options]", "list contents of directories in a tree-like format", Tree.Run, Tree.Help));
         Register(new CmdEntry("test", "test [suite]", "run kernel and command automated test suites", Test.Run, Test.Help));
     }
 

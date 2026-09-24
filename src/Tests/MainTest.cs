@@ -68,6 +68,7 @@ public static class MainTest
             blocks.Add(TestFileCommands());
             blocks.Add(TestSystemInfoUtilities());
             blocks.Add(TestUnixCoreutilsAndRedirection());
+            blocks.Add(TestFindAndTreeCommands());
         }
         finally
         {
@@ -426,26 +427,27 @@ public static class MainTest
         Check(Exec("dmesg") == 0 && Exec("dmesg -h") == 0, "dmesg & dmesg -h");
         Check(Exec("clear") == 0 && Exec("clear --help") == 0, "clear & clear --help");
 
-        string[] topics = ["ls", "cat", "cd", "pwd", "touch", "mkdir", "rm", "rmdir", "df", "stat", "uname", "uptime", "free", "ps", "jobs", "kill", "wait", "sleep", "help", "dmesg", "clear", "test"];
+        string[] topics = ["ls", "cat", "cd", "pwd", "touch", "mkdir", "rm", "rmdir", "df", "stat", "uname", "uptime", "free", "ps", "jobs", "kill", "wait", "sleep", "help", "dmesg", "clear", "test", "find", "tree"];
         bool helpOk = true;
         foreach (string t in topics)
         {
             if (Exec($"help {t}") != 0) { helpOk = false; break; }
         }
-        Check(helpOk, "help builtin topics (22)");
+        Check(helpOk, "help builtin topics (24)");
 
         string[] cmdHelps = [
             "ps --help", "jobs -h", "kill --help", "wait -h", "sleep --help",
             "dmesg -h", "cat --help", "cd -h", "pwd --help", "touch -h",
             "mkdir --help", "rm -h", "rmdir --help", "stat --help", "uname -h",
-            "uptime --help", "free -h", "clear -h", "clear --help", "test -h", "test --help"
+            "uptime --help", "free -h", "clear -h", "clear --help", "test -h", "test --help",
+            "find --help", "find -h", "tree --help", "tree -h"
         ];
         bool flagsOk = true;
         foreach (string c in cmdHelps)
         {
             if (Exec(c) != 0) { flagsOk = false; break; }
         }
-        Check(flagsOk, "Universal -h/--help flags (21)");
+        Check(flagsOk, "Universal -h/--help flags (25)");
 
         return block;
     }
@@ -484,6 +486,30 @@ public static class MainTest
 
         Exec($"rm -f {rFile} /tmp/grep_res.txt /tmp/head_res.txt /tmp/tail_res.txt /tmp/wc_res.txt /tmp/tee1.txt /tmp/tee2.txt");
 
+        return block;
+    }
+
+    private static TestBlock TestFindAndTreeCommands()
+    {
+        TestBlock block = new("find & tree Commands");
+        CurBlock = block;
+
+        string tDir = "/tmp/find_tree_test";
+        if (Directory.Exists(tDir)) Directory.Delete(tDir, true);
+        Directory.CreateDirectory($"{tDir}/sub");
+        File.WriteAllText($"{tDir}/file1.txt", "hello");
+        File.WriteAllText($"{tDir}/sub/file2.log", "world");
+
+        Check(Exec($"find {tDir}") == 0, "find directory hierarchy");
+        Check(Exec($"find {tDir} -name *.log") == 0, "find -name pattern");
+        Check(Exec($"find {tDir} -type f") == 0, "find -type f");
+        Check(Exec($"find {tDir} -maxdepth 1") == 0, "find -maxdepth 1");
+
+        Check(Exec($"tree {tDir}") == 0, "tree directory listing");
+        Check(Exec($"tree {tDir} -L 1") == 0, "tree -L 1 level");
+        Check(Exec($"tree {tDir} -d") == 0, "tree -d directories only");
+
+        Directory.Delete(tDir, true);
         return block;
     }
 
