@@ -104,16 +104,22 @@ public static class PManager
 
         lock (Procs)
         {
-            for (int attempts = 0; attempts < MaxProcesses - 1; attempts++)
+            for (int pass = 0; pass < 2; pass++)
             {
-                int candidate = NextPid++;
-                if (NextPid >= MaxProcesses) NextPid = KernelPid + 1;
-
-                if (Procs[candidate] == null)
+                for (int attempts = 0; attempts < MaxProcesses - 1; attempts++)
                 {
-                    pid = candidate;
-                    break;
+                    int candidate = NextPid++;
+                    if (NextPid >= MaxProcesses) NextPid = KernelPid + 1;
+
+                    if (Procs[candidate] == null)
+                    {
+                        pid = candidate;
+                        break;
+                    }
                 }
+
+                if (pid != -1) break;
+                if (pass == 0) ReapOrphans(force: true);
             }
 
             if (pid == -1) return -1;
@@ -127,7 +133,8 @@ public static class PManager
                 try
                 {
                     entry(pid, args);
-                    Exit(pid, IsKillReq(pid) ? KillCode : 0);
+                    if (Get(pid)?.State == PState.Running)
+                        Exit(pid, IsKillReq(pid) ? KillCode : 0);
                 }
                 catch (Exception ex)
                 {
@@ -208,6 +215,9 @@ public static class PManager
             if (pid >= 0 && pid < MaxProcesses && Procs[pid] != null)
             {
                 PInfo p = Procs[pid]!;
+                if (p.Thread != null && Thread.CurrentThread != p.Thread)
+                    return false;
+
                 if (p.State is PState.Zombie or PState.Terminated or PState.Failed)
                     return false;
 

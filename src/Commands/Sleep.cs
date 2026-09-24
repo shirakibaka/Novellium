@@ -17,7 +17,6 @@ public static class Sleep
             return;
         }
 
-        if (args[1] is "-h" or "--help") { Help(); return; }
 
         if (!int.TryParse(args[1], out int sec) || sec < 0)
         {

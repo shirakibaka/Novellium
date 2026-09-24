@@ -23,7 +23,6 @@ public static class Ls
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "-h" or "--help") { Help(); return; }
 
             if (a.StartsWith("--"))
             {
@@ -43,7 +42,6 @@ public static class Ls
                     if (c == 'a') showAll = true;
                     else if (c == 'l') longFmt = true;
                     else if (c == '1') onePerLine = true;
-                    else if (c == 'h') { Help(); return; }
                     else
                     {
                         Output.WriteLine($"ls: invalid option -- '{c}'", ConsoleColor.Red);

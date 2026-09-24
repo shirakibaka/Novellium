@@ -16,7 +16,6 @@ public static class Kill
             return;
         }
 
-        if (args[1] is "-h" or "--help") { Help(); return; }
 
         if (!int.TryParse(args[1], out int targetPid))
         {

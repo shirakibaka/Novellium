@@ -17,7 +17,6 @@ public static class Mkdir
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "-h" or "--help") { Help(); return; }
             if (a is "-p" or "--parents") parents = true;
             else if (a.StartsWith('-') && a.Length > 1)
             {

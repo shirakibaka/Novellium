@@ -15,7 +15,6 @@ public static class Free
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "--help") { Help(); return; }
             if (a is "-h" or "--human") human = true;
             else if (a is "-m" or "--mega") unit = 1024 * 1024;
             else if (a is "-k" or "--kilo") unit = 1024;

@@ -14,7 +14,6 @@ public static class Uname
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "-h" or "--help") { Help(); return; }
             if (a is "-a" or "--all") all = true;
             else if (a.StartsWith('-') && a.Length > 1)
             {

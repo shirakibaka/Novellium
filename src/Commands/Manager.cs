@@ -64,7 +64,9 @@ public static class CManager
 
         for (int i = 1; i < args.Length; i++)
         {
-            if (args[i] is "-h" or "--help")
+            string a = args[i];
+            bool isHelp = (cmdName is "df" or "free") ? (a == "--help") : (a is "-h" or "--help");
+            if (isHelp)
             {
                 entry.HelpHandler();
                 return 0;

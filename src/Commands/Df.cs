@@ -16,7 +16,6 @@ public static class Df
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "--help") { Help(); return; }
             if (a is "-h" or "--human-readable") human = true;
             else if (a is "-k") unit = 1024;
             else if (a is "-m") unit = 1024 * 1024;

@@ -14,7 +14,6 @@ public static class Dmesg
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "-h" or "--help") { Help(); return; }
             if (a is "-c" or "--clear") clear = true;
             else
             {

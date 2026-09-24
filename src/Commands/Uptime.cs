@@ -9,8 +9,6 @@ public static class Uptime
 {
     public static void Run(int pid, string[] args)
     {
-        if (args.Length > 1 && args[1] is "-h" or "--help") { Help(); return; }
-
         DateTime now = DateTime.UtcNow;
         TimeSpan up = TimeSpan.FromMilliseconds(Environment.TickCount64);
         string time = $"{now.Hour:D2}:{now.Minute:D2}:{now.Second:D2}";

@@ -16,7 +16,6 @@ public static class Stat
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a is "-h" or "--help") { Help(); return; }
             if (a.StartsWith('-') && a.Length > 1)
             {
                 Output.WriteLine($"stat: invalid option -- '{a}'", ConsoleColor.Red);
