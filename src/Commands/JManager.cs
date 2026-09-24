@@ -67,28 +67,27 @@ public static class JManager
 
     public static int Update(int parentPid)
     {
+        List<Job> snap;
+        lock (Lock) snap = new(Jobs);
+
         List<(int Id, int Pid, int Code)>? done = null;
-        lock (Lock)
+        foreach (Job j in snap)
         {
-            for (int i = Jobs.Count - 1; i >= 0; i--)
+            if (j.IsWaited) continue;
+
+            PInfo? p = PManager.Get(j.Pid);
+            if (p == null || p.Value.ParentPid != parentPid)
             {
-                Job j = Jobs[i];
-                if (j.IsWaited) continue;
-
-                PInfo? p = PManager.Get(j.Pid);
-                if (p == null || p.Value.ParentPid != parentPid)
-                {
-                    Jobs.RemoveAt(i);
-                    continue;
-                }
-
-                if (p.Value.State != PState.Zombie) continue;
-                if (!PManager.Reap(parentPid, j.Pid, out int code)) continue;
-
-                done ??= new();
-                done.Add((j.Id, j.Pid, code));
-                Jobs.RemoveAt(i);
+                Remove(j.Pid, out _);
+                continue;
             }
+
+            if (p.Value.State != PState.Zombie) continue;
+            if (!PManager.Reap(parentPid, j.Pid, out int code)) continue;
+
+            done ??= new();
+            done.Add((j.Id, j.Pid, code));
+            Remove(j.Pid, out _);
         }
 
         if (done == null) return 0;
@@ -99,14 +98,13 @@ public static class JManager
 
     public static void List()
     {
-        lock (Lock)
+        List<Job> snap;
+        lock (Lock) snap = new(Jobs);
+
+        foreach (Job j in snap)
         {
-            for (int i = 0; i < Jobs.Count; i++)
-            {
-                Job j = Jobs[i];
-                PInfo? p = PManager.Get(j.Pid);
-                if (p != null) Output.WriteLine($"[{j.Id}] {j.Pid} {p.Value.State} {j.Name}");
-            }
+            PInfo? p = PManager.Get(j.Pid);
+            if (p != null) Output.WriteLine($"[{j.Id}] {j.Pid} {p.Value.State} {j.Name}");
         }
     }
 }
