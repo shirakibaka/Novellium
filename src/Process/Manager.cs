@@ -41,7 +41,7 @@ public static class PManager
         return true;
     }
 
-    public static int Start(string name, string[] args, Action<int, string[]> entry, int parentPid = KernelPid)
+    public static int Start(string name, string[] args, Action<int, string[]> entry, int parentPid = KernelPid, bool isWaited = false)
     {
         int pid;
         Thread thread;
@@ -72,7 +72,7 @@ public static class PManager
                 State = PState.Created,
                 ExitCode = 0,
                 KillReq = false,
-                IsWaited = false,
+                IsWaited = isWaited,
                 Thread = thread
             });
         }
@@ -300,8 +300,8 @@ public static class PManager
         SetWaited(pid, true);
         try
         {
-            int elapsed = 0;
-            while (timeoutMs < 0 || elapsed < timeoutMs)
+            long startTick = Environment.TickCount64;
+            while (timeoutMs < 0 || (Environment.TickCount64 - startTick) < timeoutMs)
             {
                 if (checkPid > 0 && IsKillReq(checkPid)) return false;
 
@@ -311,8 +311,24 @@ public static class PManager
                 if (p.Value.State == PState.Zombie)
                     return Reap(parentPid, pid, out exitCode);
 
-                Thread.Sleep(2);
-                elapsed += 2;
+                if (p.Value.State is PState.Terminated or PState.Failed)
+                {
+                    exitCode = p.Value.ExitCode != 0 ? p.Value.ExitCode : ErrCode;
+                    lock (Procs)
+                    {
+                        for (int i = 0; i < Procs.Count; i++)
+                        {
+                            if (Procs[i].Pid == pid)
+                            {
+                                Procs.RemoveAt(i);
+                                break;
+                            }
+                        }
+                    }
+                    return true;
+                }
+
+                Thread.Sleep(5);
             }
             return false;
         }

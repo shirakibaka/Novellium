@@ -77,7 +77,7 @@ public static class CManager
         };
 
         if (handler != null)
-            return PManager.Start(cmd, args, handler, parentPid);
+            return PManager.Start(cmd, args, handler, parentPid, isWaited: !background);
 
         Output.WriteLine($"Unknown command: {cmd}");
         return 0;
