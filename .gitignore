@@ -11,6 +11,7 @@ output-x64/
 512
 disk
 *.img
+!disk.gz
 !disk.img.gz
 *.vmdk
 *.vdi

@@ -43,10 +43,10 @@ All commands are implemented in `src/Commands/` and support `-h` / `--help`:
 
 For immediate testing without building from source:
 - **Bootable ISO:** [`dist/Novellium.iso`](file:///home/maidochka/Code/cosmos/Novellium/dist/Novellium.iso) (8.9 MiB).
-- **Storage Disk Image:** [`disk.img`](file:///home/maidochka/Code/cosmos/Novellium/disk.img) (512 MiB raw Ext2 disk formatted for AHCI SATA) located in the project root directory alongside `Kernel.cs`.
+- **Storage Disk Image:** [`disk`](file:///home/maidochka/Code/cosmos/Novellium/disk) (512 MiB raw Ext2 disk formatted for AHCI SATA) located in the project root directory alongside `Kernel.cs`.
   - When cloning from Git, unpack the compressed image:
     ```bash
-    gzip -d -k disk.img.gz
+    gzip -d -k disk.gz
     ```
 
 ## Build & Run
@@ -75,7 +75,7 @@ qemu-system-x86_64 \
     -vga virtio \
     -display sdl,gl=on \
     -device ahci,id=ahci \
-    -drive id=disk,file=disk.img,format=raw,if=none \
+    -drive id=disk,file=disk,format=raw,if=none \
     -device ide-hd,drive=disk,bus=ahci.0 \
     -cdrom dist/Novellium.iso \
     -boot d
