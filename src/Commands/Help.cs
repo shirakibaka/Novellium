@@ -27,12 +27,19 @@ public static class Help
 
     public static void Show()
     {
-        Output.WriteLine("Novellium Builtin Commands:", ConsoleColor.White);
+        Output.WriteLine("Novellium Commands:", ConsoleColor.White);
         Output.WriteLine();
+
+        int maxLen = 0;
+        foreach (CmdEntry cmd in CmdRegistry.GetAll())
+        {
+            if (cmd.Name.Length > maxLen) maxLen = cmd.Name.Length;
+        }
+        maxLen = Math.Max(maxLen + 2, 12);
 
         foreach (CmdEntry cmd in CmdRegistry.GetAll())
         {
-            Output.WriteLine($"  {cmd.Synopsis,-20} {cmd.Summary}", ConsoleColor.Gray);
+            Output.WriteLine($"  {cmd.Name.PadRight(maxLen)} {cmd.Summary}", ConsoleColor.Gray);
         }
 
         Output.WriteLine();

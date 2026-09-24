@@ -115,7 +115,7 @@ public static class CManager
         List<string> stages = SplitPipeline(trimmed);
         if (stages.Count > 1)
         {
-            string pipeStdin = "";
+            string? pipeStdin = null;
             int lastPid = 0;
             for (int s = 0; s < stages.Count; s++)
             {
@@ -193,10 +193,10 @@ public static class CManager
         else
         {
             pid = PManager.Start(entry.Name, args, entry.Handler, parentPid, isWaited: !background, stdinText: stdinText, captureStdout: captureStdout);
-            if (pid > 0 && captureStdout && !background)
+            if (pid > 0 && !background)
             {
                 PManager.Wait(parentPid, pid, out _);
-                capturedOut = PManager.GetOutput(pid);
+                if (captureStdout) capturedOut = PManager.GetOutput(pid);
             }
         }
 

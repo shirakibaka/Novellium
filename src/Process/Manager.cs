@@ -155,6 +155,10 @@ public static class PManager
                     OutputInfo.Error($"[PROCESS] PID: {pid} NAME: {name} error: {ex.Message}");
                     Exit(pid, ErrCode);
                 }
+                finally
+                {
+                    if (stdinText != null) Output.SetStdin(null);
+                }
             });
 
             Procs[pid] = new PInfo
