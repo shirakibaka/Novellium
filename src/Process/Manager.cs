@@ -15,6 +15,7 @@ public static class PManager
     private const int ErrCode = 1;
 
     private static readonly PInfo?[] Procs = new PInfo?[MaxProcesses];
+    private static readonly Dictionary<int, int> ReapedExitCodes = new();
     private static int NextPid = KernelPid + 1;
 
     public static int Count
@@ -80,6 +81,7 @@ public static class PManager
         lock (Procs)
         {
             Array.Clear(Procs, 0, Procs.Length);
+            ReapedExitCodes.Clear();
             NextPid = KernelPid + 1;
             Procs[KernelPid] = new PInfo
             {
@@ -271,6 +273,7 @@ public static class PManager
                 if (p.ParentPid == parentPid && p.State == PState.Zombie)
                 {
                     exitCode = p.ExitCode;
+                    ReapedExitCodes[pid] = exitCode;
                     Procs[pid] = null;
                     return true;
                 }
@@ -295,6 +298,7 @@ public static class PManager
                 {
                     reaped ??= new();
                     reaped.Add(p.Pid);
+                    ReapedExitCodes[p.Pid] = p.ExitCode;
                     Procs[i] = null;
                     count++;
                 }
@@ -366,7 +370,19 @@ public static class PManager
                 if (checkPid > 0 && IsKillReq(checkPid)) return false;
 
                 PInfo? p = Get(pid);
-                if (p == null) return false;
+                if (p == null)
+                {
+                    lock (Procs)
+                    {
+                        if (ReapedExitCodes.TryGetValue(pid, out int reapedCode))
+                        {
+                            exitCode = reapedCode;
+                            ReapedExitCodes.Remove(pid);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
                 if (p.ParentPid != parentPid) return false;
 
                 if (p.State == PState.Zombie)
