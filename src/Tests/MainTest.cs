@@ -59,16 +59,16 @@ public static class MainTest
         Output.StartCapture();
         try
         {
-            blocks.Add(TestKernelAndSubsystems());
-            blocks.Add(TestProcessLifecycle());
-            blocks.Add(TestPathNormalization());
-            blocks.Add(TestExt2Filesystem());
-            blocks.Add(TestE2EDeveloperWorkflow());
-            blocks.Add(TestCdAndPwdCommands());
-            blocks.Add(TestFileCommands());
-            blocks.Add(TestSystemInfoUtilities());
-            blocks.Add(TestUnixCoreutilsAndRedirection());
-            blocks.Add(TestFindAndTreeCommands());
+            blocks.Add(RunBlock(TestKernelAndSubsystems));
+            blocks.Add(RunBlock(TestProcessLifecycle));
+            blocks.Add(RunBlock(TestPathNormalization));
+            blocks.Add(RunBlock(TestExt2Filesystem));
+            blocks.Add(RunBlock(TestE2EDeveloperWorkflow));
+            blocks.Add(RunBlock(TestCdAndPwdCommands));
+            blocks.Add(RunBlock(TestFileCommands));
+            blocks.Add(RunBlock(TestSystemInfoUtilities));
+            blocks.Add(RunBlock(TestUnixCoreutilsAndRedirection));
+            blocks.Add(RunBlock(TestFindAndTreeCommands));
         }
         finally
         {
@@ -95,6 +95,13 @@ public static class MainTest
             foreach (string f in FailedTests) Output.WriteDirectLine($"  - {f}", ConsoleColor.Red);
         }
         Output.WriteDirectLine();
+    }
+
+    private static TestBlock RunBlock(Func<TestBlock> func)
+    {
+        TestBlock b = func();
+        Output.WriteDirectLine($"  [+] Completed suite: {b.Title} ({b.Items.Count} tests)", ConsoleColor.Cyan);
+        return b;
     }
 
     private static string PadOrTruncate(string str, int width)

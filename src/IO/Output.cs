@@ -14,11 +14,8 @@ public static class Output
 
     public static string GetStdin()
     {
-        lock (Lock)
-        {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            return proc?.StdinText ?? string.Empty;
-        }
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        return proc?.StdinText ?? string.Empty;
     }
 
     public static void StartCapture()
@@ -66,44 +63,64 @@ public static class Output
 
     public static void Write(string text)
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            lock (proc.StdoutBuffer) proc.StdoutBuffer.Append(text);
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.Append(text);
-            else if (IsCapturing) CapturedBuffer.Append(text);
+            if (IsCapturing) CapturedBuffer.Append(text);
             else Console.Write(text);
         }
     }
 
     public static void WriteLine(string text)
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            lock (proc.StdoutBuffer) proc.StdoutBuffer.AppendLine(text);
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine(text);
-            else if (IsCapturing) CapturedBuffer.AppendLine(text);
+            if (IsCapturing) CapturedBuffer.AppendLine(text);
             else Console.WriteLine(text);
         }
     }
 
     public static void WriteLine()
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            lock (proc.StdoutBuffer) proc.StdoutBuffer.AppendLine();
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine();
-            else if (IsCapturing) CapturedBuffer.AppendLine();
+            if (IsCapturing) CapturedBuffer.AppendLine();
             else Console.WriteLine();
         }
     }
 
     public static void Write(string text, ConsoleColor color)
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            lock (proc.StdoutBuffer) proc.StdoutBuffer.Append(text);
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.Append(text);
-            else if (IsCapturing) CapturedBuffer.Append(text);
+            if (IsCapturing) CapturedBuffer.Append(text);
             else
             {
                 ConsoleColor prev = Console.ForegroundColor;
@@ -116,11 +133,16 @@ public static class Output
 
     public static void WriteLine(string text, ConsoleColor color)
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            lock (proc.StdoutBuffer) proc.StdoutBuffer.AppendLine(text);
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null) proc.StdoutBuffer.AppendLine(text);
-            else if (IsCapturing) CapturedBuffer.AppendLine(text);
+            if (IsCapturing) CapturedBuffer.AppendLine(text);
             else
             {
                 ConsoleColor prev = Console.ForegroundColor;
@@ -138,23 +160,32 @@ public static class Output
 
     public static void Clear()
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null) return;
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer == null && !IsCapturing) Console.Clear();
+            if (!IsCapturing) Console.Clear();
         }
     }
 
     public static void WriteTag(string tag, ConsoleColor tagColor, string text, ConsoleColor? textColor = null)
     {
+        PInfo? proc = PManager.Get(PManager.CurrentPid);
+        if (proc?.StdoutBuffer != null)
+        {
+            Write($"[{tag}] {text}\n");
+            return;
+        }
+
         lock (Lock)
         {
-            PInfo? proc = PManager.Get(PManager.CurrentPid);
-            if (proc?.StdoutBuffer != null || IsCapturing)
+            if (IsCapturing)
             {
-                Write($"[{tag}] {text}\n");
+                CapturedBuffer.AppendLine($"[{tag}] {text}");
                 return;
             }
+
             ConsoleColor prev = Console.ForegroundColor;
             Console.ForegroundColor = ConsoleColor.White;
             Console.Write("[");
