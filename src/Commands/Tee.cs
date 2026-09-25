@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -20,6 +21,7 @@ public static class Tee
             {
                 Output.WriteLine($"tee: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'tee --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else files.Add(a);
@@ -28,10 +30,17 @@ public static class Tee
         string stdin = Output.GetStdin();
         Output.Write(stdin);
 
+        bool hasError = false;
         foreach (string f in files)
         {
-            CManager.WriteFileText(f, stdin, append);
+            if (!CManager.WriteFileText(f, stdin, append))
+            {
+                Output.WriteLine($"tee: '{f}': Write error", ConsoleColor.Red);
+                hasError = true;
+            }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()

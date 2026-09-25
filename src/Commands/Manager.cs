@@ -5,6 +5,7 @@ using System.Text;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.IO.Cache;
 using Novellium.Process;
 
 namespace Novellium.Commands;
@@ -45,6 +46,11 @@ public static class CManager
     public static string ReadFileText(string path)
     {
         string full = ResolvePath(path);
+        if (VfsCacheEngine.TryReadFile(full, out var bytes) && bytes != null)
+        {
+            return Encoding.UTF8.GetString(bytes);
+        }
+
         if (!VfsManager.TryStat(full, out VfsStat st) || st.IsDirectory) return string.Empty;
         if (!VfsManager.TryOpenFile(full, out var h) || h == null) return string.Empty;
         using (h)
@@ -77,6 +83,8 @@ public static class CManager
             h.Write(bytes);
             h.TryFlush();
         }
+
+        VfsCacheEngine.Invalidate(full);
         return true;
     }
 
@@ -119,14 +127,116 @@ public static class CManager
         return args.ToArray();
     }
 
+    private struct CmdStatement
+    {
+        public string Text;
+        public string Operator;
+    }
+
     public static int Execute(string input, int parentPid, out bool background)
     {
         background = false;
         if (string.IsNullOrWhiteSpace(input)) return 0;
 
-        string trimmed = input.Trim();
+        List<CmdStatement> statements = ParseStatements(input);
+        int lastPidOrCode = 0;
+        int prevExitCode = 0;
+        string prevOp = "";
 
-        List<string> stages = SplitPipeline(trimmed);
+        for (int i = 0; i < statements.Count; i++)
+        {
+            CmdStatement stmt = statements[i];
+            if (string.IsNullOrWhiteSpace(stmt.Text)) continue;
+
+            if (prevOp == "&&" && prevExitCode != 0)
+            {
+                prevOp = stmt.Operator;
+                continue;
+            }
+
+            bool stmtBg = (stmt.Operator == "&");
+            int pid = ExecutePipeline(stmt.Text, parentPid, out bool pipeBg, out int exitCode);
+            bool isBg = stmtBg || pipeBg;
+
+            if (isBg)
+            {
+                background = true;
+                if (pid > 0)
+                {
+                    Output.WriteLine($"[{pid}] started", ConsoleColor.DarkGray);
+                }
+                prevExitCode = 0;
+                lastPidOrCode = pid > 0 ? pid : 0;
+            }
+            else
+            {
+                prevExitCode = exitCode;
+                lastPidOrCode = exitCode;
+            }
+
+            prevOp = stmt.Operator;
+        }
+
+        return lastPidOrCode;
+    }
+
+    private static List<CmdStatement> ParseStatements(string input)
+    {
+        var list = new List<CmdStatement>();
+        var sb = new StringBuilder();
+        bool inDouble = false, inSingle = false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+            if (c == '"' && !inSingle) { inDouble = !inDouble; sb.Append(c); }
+            else if (c == '\'' && !inDouble) { inSingle = !inSingle; sb.Append(c); }
+            else if (!inDouble && !inSingle)
+            {
+                if (c == '&')
+                {
+                    if (i + 1 < input.Length && input[i + 1] == '&')
+                    {
+                        list.Add(new CmdStatement { Text = sb.ToString().Trim(), Operator = "&&" });
+                        sb.Clear();
+                        i++;
+                    }
+                    else
+                    {
+                        list.Add(new CmdStatement { Text = sb.ToString().Trim(), Operator = "&" });
+                        sb.Clear();
+                    }
+                }
+                else if (c == ';')
+                {
+                    list.Add(new CmdStatement { Text = sb.ToString().Trim(), Operator = ";" });
+                    sb.Clear();
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        string remaining = sb.ToString().Trim();
+        if (remaining.Length > 0)
+        {
+            list.Add(new CmdStatement { Text = remaining, Operator = "" });
+        }
+
+        return list;
+    }
+
+    private static int ExecutePipeline(string input, int parentPid, out bool background, out int exitCode)
+    {
+        background = false;
+        exitCode = 0;
+        List<string> stages = SplitPipeline(input);
         if (stages.Count > 1)
         {
             string? pipeStdin = null;
@@ -134,19 +244,20 @@ public static class CManager
             for (int s = 0; s < stages.Count; s++)
             {
                 bool isLast = (s == stages.Count - 1);
-                lastPid = ExecuteStage(stages[s], parentPid, out background, pipeStdin, captureStdout: !isLast, out string stageOut);
+                lastPid = ExecuteStage(stages[s], parentPid, out background, pipeStdin, captureStdout: !isLast, out string stageOut, out exitCode);
                 pipeStdin = stageOut;
             }
             return lastPid;
         }
 
-        return ExecuteStage(trimmed, parentPid, out background, stdinText: null, captureStdout: false, out _);
+        return ExecuteStage(input, parentPid, out background, stdinText: null, captureStdout: false, out _, out exitCode);
     }
 
-    private static int ExecuteStage(string stageStr, int parentPid, out bool background, string? stdinText, bool captureStdout, out string capturedOut)
+    private static int ExecuteStage(string stageStr, int parentPid, out bool background, string? stdinText, bool captureStdout, out string capturedOut, out int exitCode)
     {
         capturedOut = "";
         background = false;
+        exitCode = 0;
 
         ParseRedirection(stageStr, out string cleanCmd, out string? inFile, out string? outFile, out bool append);
 
@@ -174,7 +285,8 @@ public static class CManager
         CmdEntry? entry = CmdRegistry.Get(cmdName);
         if (entry == null)
         {
-            Output.WriteLine($"Unknown command: {cmdName}");
+            Output.WriteLine($"Unknown command: {cmdName}", ConsoleColor.Red);
+            exitCode = 127;
             return 0;
         }
 
@@ -185,6 +297,7 @@ public static class CManager
             if (isHelp)
             {
                 entry.HelpHandler();
+                exitCode = 0;
                 return 0;
             }
         }
@@ -206,6 +319,12 @@ public static class CManager
                     capturedOut = parentProc.StdoutBuffer.ToString();
                     parentProc.StdoutBuffer = null;
                 }
+                exitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                OutputInfo.Error($"Builtin {cmdName} error: {ex.Message}");
+                exitCode = 1;
             }
             finally
             {
@@ -217,8 +336,11 @@ public static class CManager
             pid = PManager.Start(entry.Name, args, entry.Handler, parentPid, isWaited: !background, stdinText: stdinText, captureStdout: captureStdout);
             if (pid > 0 && !background)
             {
-                PManager.Wait(parentPid, pid, out _);
-                if (captureStdout) capturedOut = PManager.GetOutput(pid);
+                if (PManager.Wait(parentPid, pid, out int code, out string stageOut))
+                {
+                    exitCode = code;
+                    if (captureStdout) capturedOut = stageOut;
+                }
             }
         }
 
@@ -299,6 +421,6 @@ public static class CManager
             else sb.Append(c);
             index++;
         }
-        return sb.ToString();
+        return sb.ToString().Trim('"', '\'');
     }
 }

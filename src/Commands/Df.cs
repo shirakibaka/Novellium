@@ -3,6 +3,7 @@ using System;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -23,6 +24,7 @@ public static class Df
             {
                 Output.WriteLine($"df: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'df --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
         }
@@ -30,6 +32,7 @@ public static class Df
         if (!VfsManager.TryStatFs("/", out VfsStatFs st))
         {
             Output.WriteLine("df: failed to get filesystem statistics", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 

@@ -14,6 +14,7 @@ public static class Sleep
         {
             Output.WriteLine("usage: sleep <seconds>", ConsoleColor.Yellow);
             Output.WriteLine("Try 'sleep --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -21,6 +22,7 @@ public static class Sleep
         if (!int.TryParse(args[1], out int sec) || sec < 0)
         {
             Output.WriteLine("sleep: invalid time", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 

@@ -13,6 +13,7 @@ public static class Kill
         {
             Output.WriteLine("usage: kill <pid>", ConsoleColor.Yellow);
             Output.WriteLine("Try 'kill --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -20,11 +21,15 @@ public static class Kill
         if (!int.TryParse(args[1], out int targetPid))
         {
             Output.WriteLine("kill: invalid pid", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
         if (!PManager.Kill(targetPid))
+        {
             Output.WriteLine($"kill: process {targetPid} not found or already stopped", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
+        }
     }
 
     public static void Help()

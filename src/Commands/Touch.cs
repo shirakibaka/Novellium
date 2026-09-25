@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -20,6 +21,7 @@ public static class Touch
             {
                 Output.WriteLine($"touch: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'touch --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             files.Add(a);
@@ -32,13 +34,19 @@ public static class Touch
             return;
         }
 
+        bool hasError = false;
         foreach (string file in files)
         {
             string path = CManager.ResolvePath(file);
             if (VfsManager.TryStat(path, out _)) continue;
             if (!VfsManager.TryCreateFile(path, (VfsMode)420))
+            {
                 Output.WriteLine($"touch: cannot touch '{file}': Failed to create file", ConsoleColor.Red);
+                hasError = true;
+            }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()

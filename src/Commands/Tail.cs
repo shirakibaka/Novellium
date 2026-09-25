@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -26,6 +27,7 @@ public static class Tail
             {
                 Output.WriteLine($"tail: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'tail --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else files.Add(a);
@@ -39,6 +41,13 @@ public static class Tail
 
         foreach (string f in files)
         {
+            string path = CManager.ResolvePath(f);
+            if (!Cosmos.Kernel.System.Vfs.VfsManager.TryStat(path, out var st) || st.IsDirectory)
+            {
+                Output.WriteLine($"tail: '{f}': No such file or directory", ConsoleColor.Red);
+                PManager.Exit(pid, 1);
+                return;
+            }
             if (files.Count > 1) Output.WriteLine($"==> {f} <==");
             PrintTail(CManager.ReadFileText(f), count);
         }

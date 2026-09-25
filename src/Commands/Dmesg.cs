@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Novellium.IO;
+using Novellium.Process;
 using Novellium.Services;
 
 namespace Novellium.Commands;
@@ -19,6 +20,7 @@ public static class Dmesg
             {
                 Output.WriteLine($"dmesg: invalid option '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'dmesg --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
         }

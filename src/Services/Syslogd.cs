@@ -102,12 +102,6 @@ public static class Syslogd
         }
     }
 
-    public static void Info(string facility, string msg) => Log(LogLevel.Info, facility, msg);
-    public static void Warn(string facility, string msg) => Log(LogLevel.Warning, facility, msg);
-    public static void Error(string facility, string msg) => Log(LogLevel.Error, facility, msg);
-    public static void Ok(string facility, string msg) => Log(LogLevel.Ok, facility, msg);
-    public static void Debug(string facility, string msg) => Log(LogLevel.Debug, facility, msg);
-
     public static IReadOnlyList<LogEntry> GetRecentLogs()
     {
         lock (Lock) return new List<LogEntry>(Ring);

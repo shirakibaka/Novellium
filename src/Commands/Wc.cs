@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -23,6 +24,7 @@ public static class Wc
             {
                 Output.WriteLine($"wc: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'wc --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else files.Add(a);
@@ -42,6 +44,13 @@ public static class Wc
         int totLines = 0, totWords = 0, totBytes = 0;
         foreach (string f in files)
         {
+            string path = CManager.ResolvePath(f);
+            if (!Cosmos.Kernel.System.Vfs.VfsManager.TryStat(path, out var st) || st.IsDirectory)
+            {
+                Output.WriteLine($"wc: '{f}': No such file or directory", ConsoleColor.Red);
+                PManager.Exit(pid, 1);
+                return;
+            }
             string text = CManager.ReadFileText(f);
             var (l, w, b) = CountText(text);
             totLines += l; totWords += w; totBytes += b;

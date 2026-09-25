@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -39,6 +40,7 @@ public static class Tree
             {
                 Output.WriteLine($"tree: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'tree --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
         }
@@ -47,6 +49,7 @@ public static class Tree
         if (!VfsManager.TryStat(fullPath, out VfsStat rootStat))
         {
             Output.WriteLine($"tree: '{targetPath}': No such file or directory", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 

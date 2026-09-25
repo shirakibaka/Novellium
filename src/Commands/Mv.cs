@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -26,6 +27,7 @@ public static class Mv
                 {
                     Output.WriteLine($"mv: unrecognized option '{a}'", ConsoleColor.Red);
                     Output.WriteLine("Try 'mv --help' for more information.", ConsoleColor.Gray);
+                    PManager.Exit(pid, 1);
                     return;
                 }
             }
@@ -40,6 +42,7 @@ public static class Mv
                     {
                         Output.WriteLine($"mv: invalid option -- '{c}'", ConsoleColor.Red);
                         Output.WriteLine("Try 'mv --help' for more information.", ConsoleColor.Gray);
+                        PManager.Exit(pid, 1);
                         return;
                     }
                 }
@@ -54,6 +57,7 @@ public static class Mv
         {
             Output.WriteLine("usage: mv [OPTION]... SOURCE... DEST", ConsoleColor.Yellow);
             Output.WriteLine("Try 'mv --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -66,15 +70,18 @@ public static class Mv
         if (sources.Count > 1 && !targetIsDir)
         {
             Output.WriteLine($"mv: target '{target}' is not a directory", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string src in sources)
         {
             string srcPath = CManager.ResolvePath(src);
             if (!VfsManager.TryStat(srcPath, out VfsStat srcStat))
             {
                 Output.WriteLine($"mv: cannot stat '{src}': No such file or directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
 
@@ -85,8 +92,10 @@ public static class Mv
                 destPath = targetPath == "/" ? "/" + name : targetPath + "/" + name;
             }
 
-            MoveItem(srcPath, destPath, srcStat, force, verbose);
+            if (!MoveItem(srcPath, destPath, srcStat, force, verbose)) hasError = true;
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     private static bool MoveItem(string srcPath, string destPath, VfsStat srcStat, bool force, bool verbose)

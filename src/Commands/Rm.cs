@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -22,6 +23,7 @@ public static class Rm
             {
                 Output.WriteLine($"rm: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'rm --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else files.Add(a);
@@ -31,25 +33,37 @@ public static class Rm
         {
             Output.WriteLine("usage: rm [OPTION]... FILE...", ConsoleColor.Yellow);
             Output.WriteLine("Try 'rm --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string file in files)
         {
             string path = CManager.ResolvePath(file);
             if (!VfsManager.TryStat(path, out VfsStat stat))
             {
-                if (!force) Output.WriteLine($"rm: cannot remove '{file}': No such file or directory", ConsoleColor.Red);
+                if (!force)
+                {
+                    Output.WriteLine($"rm: cannot remove '{file}': No such file or directory", ConsoleColor.Red);
+                    hasError = true;
+                }
                 continue;
             }
             if (stat.IsDirectory)
             {
                 Output.WriteLine($"rm: cannot remove '{file}': Is a directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
             if (!VfsManager.TryUnlink(path))
+            {
                 Output.WriteLine($"rm: cannot remove '{file}': Operation failed", ConsoleColor.Red);
+                hasError = true;
+            }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()

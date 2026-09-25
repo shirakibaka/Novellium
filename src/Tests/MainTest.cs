@@ -9,6 +9,7 @@ using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.Commands;
 using Novellium.IO;
+using Novellium.IO.Cache;
 using Novellium.Process;
 using Novellium.Services;
 
@@ -76,6 +77,8 @@ public static class MainTest
             blocks.Add(RunBlock("find & tree Commands", TestFindAndTreeCommands));
             blocks.Add(RunBlock("cp & mv Commands", TestCpAndMvCommands));
             blocks.Add(RunBlock("Clock Cache Engine", TestClockCache));
+            blocks.Add(RunBlock("fallocate, dd & /dev/urandom", TestFallocateAndDdCommands));
+            blocks.Add(RunBlock("VFS Global 128MB Cache Integration", TestVfsGlobalCache));
         }
         finally
         {
@@ -199,7 +202,7 @@ public static class MainTest
         Check(k != null && k.ParentPid == 0 && k.State == PState.Running, "Kernel PID 1 state");
         Check(!PManager.Kill(1), "Kernel process immortality");
 
-        Syslogd.Info("main_test", "Master test suite syslog entry");
+        Syslogd.Log(LogLevel.Info, "main_test", "Master test suite syslog entry");
         var recentLogs = Syslogd.GetRecentLogs();
         Check(recentLogs.Count > 0, "Syslog daemon log capture");
 
@@ -530,7 +533,31 @@ public static class MainTest
         Exec($"echo \"tee_data\" | tee /tmp/tee1.txt /tmp/tee2.txt > /dev/null");
         Check(CManager.ReadFileText("/tmp/tee1.txt").Trim() == "tee_data" && CManager.ReadFileText("/tmp/tee2.txt").Trim() == "tee_data", "tee dual file output");
 
-        Exec($"rm -f {rFile} /tmp/grep_res.txt /tmp/head_res.txt /tmp/tail_res.txt /tmp/wc_res.txt /tmp/tee1.txt /tmp/tee2.txt");
+        // Test && conditional execution (success case)
+        string andFile1 = "/tmp/and_test1.txt";
+        Exec($"touch {andFile1} && echo \"AndSuccess\" > /tmp/and_out.txt");
+        Check(CManager.ReadFileText("/tmp/and_out.txt").Contains("AndSuccess"), "&& conditional AND execution on success");
+
+        // Test && conditional execution (failure skip case)
+        string andFile2 = "/tmp/and_out2.txt";
+        if (File.Exists(andFile2)) File.Delete(andFile2);
+        Exec($"cat /nonexistent_file_xyz.dat && echo \"ShouldNotRun\" > {andFile2}");
+        Check(!File.Exists(andFile2), "&& conditional AND skips command on failure");
+
+        // Test ; sequential execution
+        string seqFile = "/tmp/seq_out.txt";
+        Exec($"echo \"Part1\" > {seqFile} ; echo \"Part2\" >> {seqFile}");
+        Check(CManager.ReadFileText(seqFile).Contains("Part2"), "; sequential execution operator");
+
+        // Test & background execution
+        string bgFile = "/tmp/bg_out.dat";
+        Check(Exec($"dd if=/dev/urandom of={bgFile} bs=512 count=4 &") >= 0, "& background async job launch");
+
+        // Test < input redirection
+        Exec($"grep alpha < {rFile} > /tmp/stdin_res.txt");
+        Check(CManager.ReadFileText("/tmp/stdin_res.txt").Trim() == "alpha", "< input redirection operator");
+
+        Exec($"rm -f {rFile} /tmp/grep_res.txt /tmp/head_res.txt /tmp/tail_res.txt /tmp/wc_res.txt /tmp/tee1.txt /tmp/tee2.txt {andFile1} /tmp/and_out.txt /tmp/and_out2.txt {seqFile} {bgFile} /tmp/stdin_res.txt");
 
         return block;
     }
@@ -593,7 +620,7 @@ public static class MainTest
         CurBlock = block;
 
         // 1. Basic fill, hit & miss check
-        ClockCache cache = new(4);
+        BlockCacheEngine cache = new(4, 512, new ClockPolicy());
         byte[] dummy = new byte[] { 1, 2, 3 };
 
         cache.Put(10, dummy);
@@ -601,15 +628,15 @@ public static class MainTest
         cache.Put(30, dummy);
         cache.Put(40, dummy);
 
-        Check(cache.Count == 4 && cache.ContainsKey(10) && cache.ContainsKey(40), "ClockCache initial 4-item fill");
-        Check(cache.TryGet(10, out var d1) && d1 != null && cache.TryGet(20, out _) && cache.Hits == 2, "ClockCache hit verification & counter");
+        Check(cache.Count == 4 && cache.ContainsKey(10) && cache.ContainsKey(40), "BlockCacheEngine initial 4-item fill");
+        Check(cache.TryGet(10, out var d1) && d1 != null && cache.TryGet(20, out _) && cache.Hits == 2, "BlockCacheEngine hit verification & counter");
 
-        // 2. Second Chance Bit & Eviction
+        // 2. Second Chance Bit & Eviction (10 and 20 were accessed, so 30 is evicted)
         cache.Put(50, dummy);
-        Check(!cache.ContainsKey(30) && cache.ContainsKey(50) && cache.Evictions == 1, "ClockCache eviction of unreferenced slot");
+        Check(!cache.ContainsKey(30) && cache.ContainsKey(10) && cache.ContainsKey(20) && cache.ContainsKey(50) && cache.Evictions == 1, "BlockCacheEngine eviction of unreferenced slot");
 
         // 3. Sequential Scan Workload Simulation (32 keys on capacity 8)
-        ClockCache scanCache = new(8);
+        BlockCacheEngine scanCache = new(8, 512, new ClockPolicy());
         for (ulong i = 1; i <= 32; i++)
         {
             if (!scanCache.TryGet(i, out _))
@@ -617,10 +644,10 @@ public static class MainTest
                 scanCache.Put(i, dummy);
             }
         }
-        Check(scanCache.Misses == 32 && scanCache.Hits == 0 && scanCache.Evictions == 24, "ClockCache sequential scan workload (0% hits)");
+        Check(scanCache.Misses == 32 && scanCache.Hits == 0 && scanCache.Evictions == 24, "BlockCacheEngine sequential scan workload (0% hits)");
 
         // 4. Hotspot / Zipfian Workload Simulation (80% requests hit hot keys 1..3, 20% hit 4..20)
-        ClockCache hotCache = new(8);
+        BlockCacheEngine hotCache = new(8, 512, new ClockPolicy());
         for (ulong i = 1; i <= 8; i++) hotCache.Put(i, dummy);
         hotCache.ResetStats();
 
@@ -633,12 +660,82 @@ public static class MainTest
                 hotCache.Put(key, dummy);
             }
         }
-        Check(hotCache.HitRatio >= 70.0, "ClockCache hotspot workload high hit ratio");
+        Check(hotCache.HitRatio >= 70.0, "BlockCacheEngine hotspot workload high hit ratio");
 
         // 5. Clear & ResetState
         hotCache.Clear();
-        Check(hotCache.Count == 0 && !hotCache.ContainsKey(1), "ClockCache Clear resets capacity and items");
+        Check(hotCache.Count == 0 && !hotCache.ContainsKey(1), "BlockCacheEngine Clear resets capacity and items");
 
+        return block;
+    }
+
+    private static TestBlock TestFallocateAndDdCommands()
+    {
+        TestBlock block = new("fallocate, dd & /dev/urandom");
+        CurBlock = block;
+
+        string workDir = "/tmp/fdd_test";
+        if (Directory.Exists(workDir)) Directory.Delete(workDir, true);
+        Directory.CreateDirectory(workDir);
+
+        string fallocFile = $"{workDir}/allocated.dat";
+        Check(Exec($"fallocate -l 4K {fallocFile}") == 0 && File.Exists(fallocFile) && new FileInfo(fallocFile).Length == 4096, "fallocate 4K preallocation");
+
+        string randFile = $"{workDir}/rand.dat";
+        Check(Exec($"dd if=/dev/urandom of={randFile} bs=512 count=8") == 0 && File.Exists(randFile) && new FileInfo(randFile).Length == 4096, "dd /dev/urandom generation (4KB)");
+
+        string copyFile = $"{workDir}/copy.dat";
+        Novellium.IO.Cache.VfsCacheEngine.Engine.ResetStats();
+
+        // 1st Read of rand.dat (populates VFS cache)
+        Check(Exec($"dd if={randFile} of={copyFile} bs=512 count=8") == 0 && File.Exists(copyFile) && new FileInfo(copyFile).Length == 4096, "dd file copy (1st read populates cache)");
+        long hits1 = Novellium.IO.Cache.VfsCacheEngine.Engine.Hits;
+
+        // 2nd Read of rand.dat (hits VFS block cache!)
+        Check(Exec($"cat {randFile}") == 0, "cat cached file (2nd read hits VFS cache)");
+        long hits2 = Novellium.IO.Cache.VfsCacheEngine.Engine.Hits;
+
+        Check(hits2 > hits1, "VFS BlockCache hit verification on 2nd file read");
+
+        Directory.Delete(workDir, true);
+        return block;
+    }
+
+    private static TestBlock TestVfsGlobalCache()
+    {
+        TestBlock block = new("VFS Global 128MB Cache Integration");
+        CurBlock = block;
+
+        // 1. Capacity & Lazy Allocation Verification
+        var eng = Novellium.IO.Cache.VfsCacheEngine.Engine;
+        Check(eng.Capacity == 32768 && eng.BlockSize == 4096, "VFS Cache 128MB capacity (32,768 slots x 4KB)");
+
+        string testFile = "/tmp/cache_global_test.txt";
+        if (File.Exists(testFile)) File.Delete(testFile);
+
+        // 2. Write file
+        File.WriteAllText(testFile, "Line 1: Novellium OS\nLine 2: Fast RAM Cache\nLine 3: 128MB Pool\n");
+
+        eng.ResetStats();
+        long initialHits = eng.Hits;
+
+        // 3. 1st Read via grep (populates VFS page cache)
+        Check(Exec($"grep Novellium {testFile}") == 0, "grep 1st read (populates RAM cache)");
+
+        // 4. 2nd Read via head (hits VFS page cache!)
+        Check(Exec($"head -n 2 {testFile}") == 0, "head 2nd read");
+
+        // 5. 3rd Read via wc (hits VFS page cache!)
+        Check(Exec($"wc -l {testFile}") == 0, "wc 3rd read");
+
+        long finalHits = eng.Hits;
+        Check(finalHits > initialHits, "Global VFS cache hits on grep/head/wc utility chain");
+
+        // 6. Overwrite invalidation test
+        Check(Exec($"echo \"Updated Content\" > {testFile}") == 0, "echo > file overwrite invalidates cache");
+        Check(CManager.ReadFileText(testFile).Contains("Updated Content"), "ReadFileText reads updated content after invalidation");
+
+        if (File.Exists(testFile)) File.Delete(testFile);
         return block;
     }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -20,6 +21,7 @@ public static class Rmdir
             {
                 Output.WriteLine($"rmdir: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'rmdir --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             dirs.Add(a);
@@ -29,20 +31,24 @@ public static class Rmdir
         {
             Output.WriteLine("usage: rmdir [OPTION]... DIRECTORY...", ConsoleColor.Yellow);
             Output.WriteLine("Try 'rmdir --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string dir in dirs)
         {
             string path = CManager.ResolvePath(dir);
             if (!VfsManager.TryStat(path, out VfsStat stat))
             {
                 Output.WriteLine($"rmdir: failed to remove '{dir}': No such file or directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
             if (!stat.IsDirectory)
             {
                 Output.WriteLine($"rmdir: failed to remove '{dir}': Not a directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
             if (!VfsManager.TryRemoveDirectory(path))
@@ -59,9 +65,14 @@ public static class Rmdir
                 catch { }
 
                 if (!deleted)
+                {
                     Output.WriteLine($"rmdir: failed to remove '{dir}': Directory not empty or busy", ConsoleColor.Red);
+                    hasError = true;
+                }
             }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()

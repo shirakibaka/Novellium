@@ -23,6 +23,7 @@ public static class Free
             {
                 Output.WriteLine($"free: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'free --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
         }

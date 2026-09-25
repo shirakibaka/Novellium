@@ -26,8 +26,6 @@ public static class Cd
         int activePid = PManager.CurrentPid;
         PManager.SetCwd(activePid, target);
         if (pid > 0) PManager.SetCwd(pid, target);
-        int parentPid = PManager.GetParentPid(pid);
-        if (parentPid > 0) PManager.SetCwd(parentPid, target);
     }
 
     public static void Help()

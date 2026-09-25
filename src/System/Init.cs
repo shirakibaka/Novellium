@@ -186,19 +186,8 @@ public static class Init
 
     public static void PrintFile(string path, ConsoleColor color)
     {
-        if (VfsManager.TryOpenFile(path, out var h) && h != null)
-        {
-            using (h)
-            {
-                byte[] buf = new byte[512];
-                int read = (int)h.Read(buf);
-                if (read > 0)
-                {
-                    string text = Encoding.UTF8.GetString(buf, 0, read).TrimEnd('\r', '\n');
-                    if (!string.IsNullOrEmpty(text))
-                        Output.WriteLine(text, color);
-                }
-            }
-        }
+        string text = CManager.ReadFileText(path).TrimEnd('\r', '\n');
+        if (!string.IsNullOrEmpty(text))
+            Output.WriteLine(text, color);
     }
 }

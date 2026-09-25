@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -31,6 +32,7 @@ public static class Ls
                 {
                     Output.WriteLine($"ls: unrecognized option '{a}'", ConsoleColor.Red);
                     Output.WriteLine("Try 'ls --help' for more information.", ConsoleColor.Gray);
+                    PManager.Exit(pid, 1);
                     return;
                 }
             }
@@ -46,6 +48,7 @@ public static class Ls
                     {
                         Output.WriteLine($"ls: invalid option -- '{c}'", ConsoleColor.Red);
                         Output.WriteLine("Try 'ls --help' for more information.", ConsoleColor.Gray);
+                        PManager.Exit(pid, 1);
                         return;
                     }
                 }
@@ -57,6 +60,7 @@ public static class Ls
             paths.Add((CManager.CurrentDirectory, CManager.CurrentDirectory));
 
         bool multi = paths.Count > 1;
+        bool hasError = false;
         for (int i = 0; i < paths.Count; i++)
         {
             var (norm, orig) = paths[i];
@@ -65,23 +69,25 @@ public static class Ls
                 if (i > 0) Output.WriteLine();
                 Output.WriteLine($"{orig}:", ConsoleColor.Gray);
             }
-            ListDir(norm, orig, showAll, longFmt, onePerLine);
+            if (!ListDir(norm, orig, showAll, longFmt, onePerLine)) hasError = true;
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
-    private static void ListDir(string path, string orig, bool showAll, bool longFmt, bool onePerLine)
+    private static bool ListDir(string path, string orig, bool showAll, bool longFmt, bool onePerLine)
     {
         if (!VfsManager.TryStat(path, out VfsStat targetStat))
         {
             Output.WriteLine($"ls: cannot access '{orig}': No such file or directory", ConsoleColor.Red);
-            return;
+            return false;
         }
 
         if (!targetStat.IsDirectory)
         {
             Print(FileName(orig), targetStat, longFmt);
             if (!longFmt) Output.WriteLine();
-            return;
+            return true;
         }
 
         IReadOnlyList<IVfsInode>? entries = null;
@@ -95,13 +101,13 @@ public static class Ls
         else
         {
             Output.WriteLine($"ls: cannot open directory '{orig}'", ConsoleColor.Red);
-            return;
+            return false;
         }
 
         if (entries == null)
         {
             Output.WriteLine($"ls: failed to read directory '{orig}'", ConsoleColor.Red);
-            return;
+            return false;
         }
 
         List<Entry> list = new();
@@ -163,6 +169,7 @@ public static class Ls
             }
             if (list.Count > 0) Output.WriteLine();
         }
+        return true;
     }
 
     private static string FileName(string path)

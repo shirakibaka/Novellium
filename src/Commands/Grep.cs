@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -25,6 +26,7 @@ public static class Grep
             {
                 Output.WriteLine($"grep: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'grep --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else if (pattern == null) pattern = a;
@@ -35,6 +37,7 @@ public static class Grep
         {
             Output.WriteLine("usage: grep [OPTION]... PATTERN [FILE]...", ConsoleColor.Yellow);
             Output.WriteLine("Try 'grep --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -50,6 +53,13 @@ public static class Grep
         bool showPrefix = files.Count > 1;
         foreach (string f in files)
         {
+            string path = CManager.ResolvePath(f);
+            if (!Cosmos.Kernel.System.Vfs.VfsManager.TryStat(path, out var st) || st.IsDirectory)
+            {
+                Output.WriteLine($"grep: '{f}': No such file or directory", ConsoleColor.Red);
+                PManager.Exit(pid, 1);
+                return;
+            }
             string text = CManager.ReadFileText(f);
             ProcessText(text, pattern, comp, invert, lineNum, prefix: showPrefix ? f : null);
         }

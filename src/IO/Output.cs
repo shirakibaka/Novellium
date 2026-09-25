@@ -217,8 +217,6 @@ public static class Output
         }
     }
 
-    public static void WriteTaggedLine(string tag, ConsoleColor tagColor, string text, ConsoleColor? textColor = null)
-        => WriteTag(tag, tagColor, text, textColor);
 }
 
 public static class OutputInfo
@@ -258,7 +256,4 @@ public static class OutputInfo
 
     public static void Test(bool passed, string text)
         => Output.WriteTag(passed ? "PASS" : "FAIL", passed ? ConsoleColor.Green : ConsoleColor.Red, text);
-
-    public static void TestWarning(string text)
-        => Output.WriteTag("WARN", ConsoleColor.Yellow, text);
 }

@@ -5,6 +5,8 @@ using System.Text;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.IO.Cache;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -23,6 +25,7 @@ public static class Cat
             {
                 Output.WriteLine($"cat: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'cat --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else files.Add(a);
@@ -49,51 +52,64 @@ public static class Cat
             }
             return;
         }
+
+        bool hasError = false;
         foreach (string f in files)
         {
             string path = CManager.ResolvePath(f);
             if (!VfsManager.TryStat(path, out VfsStat st))
             {
                 Output.WriteLine($"cat: {f}: No such file or directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
             if (st.IsDirectory)
             {
                 Output.WriteLine($"cat: {f}: Is a directory", ConsoleColor.Red);
-                continue;
-            }
-            if (!VfsManager.TryOpenFile(path, out var h) || h == null)
-            {
-                Output.WriteLine($"cat: {f}: Cannot open file", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
 
-            using (h)
+            string content;
+            if (VfsCacheEngine.TryReadFile(path, out var cachedData) && cachedData != null)
             {
-                byte[] buf = new byte[1024];
-                StringBuilder sb = new();
-                long read;
-                while ((read = h.Read(buf)) > 0)
-                    sb.Append(Encoding.UTF8.GetString(buf, 0, (int)read));
-
-                string content = sb.ToString();
-                if (!num)
+                content = Encoding.UTF8.GetString(cachedData);
+            }
+            else
+            {
+                if (!VfsManager.TryOpenFile(path, out var h) || h == null)
                 {
-                    Output.Write(content);
-                    if (!content.EndsWith('\n')) Output.WriteLine();
+                    Output.WriteLine($"cat: {f}: Cannot open file", ConsoleColor.Red);
+                    hasError = true;
+                    continue;
                 }
-                else
+
+                using (h)
                 {
-                    string[] lines = content.Split('\n');
-                    for (int j = 0; j < lines.Length; j++)
-                    {
-                        if (j == lines.Length - 1 && string.IsNullOrEmpty(lines[j])) break;
-                        Output.WriteLine($"{line,6}  {lines[j]}");
-                        line++;
-                    }
+                    byte[] buf = new byte[(int)st.Size];
+                    long read = h.Read(buf);
+                    content = Encoding.UTF8.GetString(buf, 0, (int)read);
+                }
+            }
+
+            if (!num)
+            {
+                Output.Write(content);
+                if (!content.EndsWith('\n')) Output.WriteLine();
+            }
+            else
+            {
+                string[] lines = content.Split('\n');
+                for (int j = 0; j < lines.Length; j++)
+                {
+                    if (j == lines.Length - 1 && string.IsNullOrEmpty(lines[j])) break;
+                    Output.WriteLine($"{line,6}  {lines[j]}");
+                    line++;
                 }
             }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -19,18 +20,42 @@ public static class Find
         for (int i = 1; i < args.Length; i++)
         {
             string a = args[i];
-            if (a == "-name" && i + 1 < args.Length)
+            if (a == "-name")
             {
+                if (i + 1 >= args.Length)
+                {
+                    Output.WriteLine("find: missing argument to '-name'", ConsoleColor.Red);
+                    PManager.Exit(pid, 1);
+                    return;
+                }
                 namePattern = args[++i];
             }
-            else if (a == "-type" && i + 1 < args.Length)
+            else if (a == "-type")
             {
+                if (i + 1 >= args.Length)
+                {
+                    Output.WriteLine("find: missing argument to '-type'", ConsoleColor.Red);
+                    PManager.Exit(pid, 1);
+                    return;
+                }
                 string t = args[++i];
                 if (t == "f") typeFilter = 'f';
                 else if (t == "d") typeFilter = 'd';
+                else
+                {
+                    Output.WriteLine($"find: Unknown argument to -type: '{t}'", ConsoleColor.Red);
+                    PManager.Exit(pid, 1);
+                    return;
+                }
             }
-            else if (a == "-maxdepth" && i + 1 < args.Length && int.TryParse(args[i + 1], out int depth))
+            else if (a == "-maxdepth")
             {
+                if (i + 1 >= args.Length || !int.TryParse(args[i + 1], out int depth))
+                {
+                    Output.WriteLine("find: missing or invalid argument to '-maxdepth'", ConsoleColor.Red);
+                    PManager.Exit(pid, 1);
+                    return;
+                }
                 maxDepth = depth;
                 i++;
             }
@@ -42,6 +67,7 @@ public static class Find
             {
                 Output.WriteLine($"find: unknown predicate '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'find --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
         }
@@ -50,6 +76,7 @@ public static class Find
         if (!VfsManager.TryStat(fullPath, out _))
         {
             Output.WriteLine($"find: '{targetPath}': No such file or directory", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 

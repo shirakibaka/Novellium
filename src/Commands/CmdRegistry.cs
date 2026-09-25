@@ -62,6 +62,9 @@ public static class CmdRegistry
         Register(new CmdEntry("tree", "tree [path] [options]", "list contents of directories in a tree-like format", Tree.Run, Tree.Help));
         Register(new CmdEntry("cp", "cp [options] source... dest", "copy files and directories", Cp.Run, Cp.Help));
         Register(new CmdEntry("mv", "mv [options] source... dest", "move (rename) files and directories", Mv.Run, Mv.Help));
+        Register(new CmdEntry("fallocate", "fallocate -l LENGTH FILE", "preallocate space to a file", Fallocate.Run, Fallocate.Help));
+        Register(new CmdEntry("dd", "dd [if=FILE] [of=FILE] [bs=BYTES] [count=N]", "convert and copy a file", Dd.Run, Dd.Help));
+        Register(new CmdEntry("cache", "cache [options]", "inspect block cache statistics and run benchmarks", CacheTest.Run, CacheTest.Help));
         Register(new CmdEntry("test", "test [suite]", "run kernel and command automated test suites", Test.Run, Test.Help));
     }
 

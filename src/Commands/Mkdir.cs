@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -22,6 +23,7 @@ public static class Mkdir
             {
                 Output.WriteLine($"mkdir: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'mkdir --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             else dirs.Add(a);
@@ -31,27 +33,38 @@ public static class Mkdir
         {
             Output.WriteLine("usage: mkdir [OPTION]... DIRECTORY...", ConsoleColor.Yellow);
             Output.WriteLine("Try 'mkdir --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string dir in dirs)
         {
             string path = CManager.ResolvePath(dir);
-            if (parents) MakeParents(path);
+            if (parents)
+            {
+                if (!MakeParents(path)) hasError = true;
+            }
             else
             {
                 if (VfsManager.TryStat(path, out _))
                 {
                     Output.WriteLine($"mkdir: cannot create directory '{dir}': File exists", ConsoleColor.Red);
+                    hasError = true;
                     continue;
                 }
                 if (!VfsManager.TryCreateDirectory(path, (VfsMode)493))
+                {
                     Output.WriteLine($"mkdir: cannot create directory '{dir}': Failed", ConsoleColor.Red);
+                    hasError = true;
+                }
             }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
-    private static void MakeParents(string path)
+    private static bool MakeParents(string path)
     {
         string[] parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         string cur = "";
@@ -63,16 +76,17 @@ public static class Mkdir
                 if (!stat.IsDirectory)
                 {
                     Output.WriteLine($"mkdir: cannot create directory '{path}': Not a directory", ConsoleColor.Red);
-                    return;
+                    return false;
                 }
                 continue;
             }
             if (!VfsManager.TryCreateDirectory(cur, (VfsMode)493))
             {
                 Output.WriteLine($"mkdir: cannot create directory '{cur}': Failed", ConsoleColor.Red);
-                return;
+                return false;
             }
         }
+        return true;
     }
 
     public static void Help()

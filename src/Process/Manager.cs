@@ -33,7 +33,6 @@ public static class PManager
         }
     }
 
-    internal static bool SimulateThreadStartFailure = false;
     public static bool AutomaticOrphanReaping { get; set; } = true;
 
     [ThreadStatic]
@@ -176,9 +175,6 @@ public static class PManager
 
         try
         {
-            if (SimulateThreadStartFailure)
-                throw new InvalidOperationException("Simulated thread start failure");
-
             thread.Start();
         }
         catch (Exception ex)
@@ -188,8 +184,7 @@ public static class PManager
                 if (pid >= 0 && pid < MaxProcesses) Procs[pid] = null;
             }
 
-            if (!SimulateThreadStartFailure)
-                OutputInfo.Error($"[PROCESS] Failed to start thread for PID {pid} NAME {name}: {ex.Message}");
+            OutputInfo.Error($"[PROCESS] Failed to start thread for PID {pid} NAME {name}: {ex.Message}");
             return -1;
         }
 
@@ -316,6 +311,7 @@ public static class PManager
 
         lock (Procs)
         {
+            if (ReapedExitCodes.Count > MaxProcesses) ReapedExitCodes.Clear();
             for (int i = 0; i < MaxProcesses; i++)
             {
                 PInfo? p = Procs[i];
@@ -382,8 +378,12 @@ public static class PManager
     }
 
     public static bool Wait(int parentPid, int pid, out int exitCode, int callerPid = 0, int timeoutMs = -1)
+        => Wait(parentPid, pid, out exitCode, out _, callerPid, timeoutMs);
+
+    public static bool Wait(int parentPid, int pid, out int exitCode, out string output, int callerPid = 0, int timeoutMs = -1)
     {
         exitCode = 0;
+        output = string.Empty;
         int checkPid = callerPid != 0 ? callerPid : parentPid;
 
         SetWaited(pid, true);
@@ -411,11 +411,15 @@ public static class PManager
                 if (p.ParentPid != parentPid) return false;
 
                 if (p.State == PState.Zombie)
+                {
+                    output = p.OutputBuffer ?? string.Empty;
                     return Reap(parentPid, pid, out exitCode);
+                }
 
                 if (p.State is PState.Terminated or PState.Failed)
                 {
                     exitCode = p.ExitCode != 0 ? p.ExitCode : ErrCode;
+                    output = p.OutputBuffer ?? string.Empty;
                     lock (Procs)
                     {
                         if (pid >= 0 && pid < MaxProcesses) Procs[pid] = null;

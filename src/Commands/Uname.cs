@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -30,6 +31,7 @@ public static class Uname
                     {
                         Output.WriteLine($"uname: invalid option -- '{c}'", ConsoleColor.Red);
                         Output.WriteLine("Try 'uname --help' for more information.", ConsoleColor.Gray);
+                        PManager.Exit(pid, 1);
                         return;
                     }
                 }

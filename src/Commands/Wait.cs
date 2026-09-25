@@ -13,18 +13,21 @@ public static class Wait
         {
             Output.WriteLine("usage: wait <pid>", ConsoleColor.Yellow);
             Output.WriteLine("Try 'wait --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
         if (!int.TryParse(args[1], out int targetPid))
         {
             Output.WriteLine("wait: invalid pid", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
         if (targetPid == pid)
         {
             Output.WriteLine("wait: cannot wait for itself", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -32,6 +35,7 @@ public static class Wait
         if (caller == null)
         {
             Output.WriteLine("wait: caller process not found", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -44,6 +48,7 @@ public static class Wait
             {
                 if (PManager.IsKillReq(pid)) return;
                 Output.WriteLine($"wait: process {targetPid} not found", ConsoleColor.Red);
+                PManager.Exit(pid, 1);
                 return;
             }
 

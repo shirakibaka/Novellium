@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -27,6 +28,7 @@ public static class Cp
                 {
                     Output.WriteLine($"cp: unrecognized option '{a}'", ConsoleColor.Red);
                     Output.WriteLine("Try 'cp --help' for more information.", ConsoleColor.Gray);
+                    PManager.Exit(pid, 1);
                     return;
                 }
             }
@@ -42,6 +44,7 @@ public static class Cp
                     {
                         Output.WriteLine($"cp: invalid option -- '{c}'", ConsoleColor.Red);
                         Output.WriteLine("Try 'cp --help' for more information.", ConsoleColor.Gray);
+                        PManager.Exit(pid, 1);
                         return;
                     }
                 }
@@ -56,6 +59,7 @@ public static class Cp
         {
             Output.WriteLine("usage: cp [OPTION]... SOURCE... DEST", ConsoleColor.Yellow);
             Output.WriteLine("Try 'cp --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
@@ -68,15 +72,18 @@ public static class Cp
         if (sources.Count > 1 && !targetIsDir)
         {
             Output.WriteLine($"cp: target '{target}' is not a directory", ConsoleColor.Red);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string src in sources)
         {
             string srcPath = CManager.ResolvePath(src);
             if (!VfsManager.TryStat(srcPath, out VfsStat srcStat))
             {
                 Output.WriteLine($"cp: cannot stat '{src}': No such file or directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
 
@@ -92,15 +99,18 @@ public static class Cp
                 if (!recursive)
                 {
                     Output.WriteLine($"cp: -r not specified; omitting directory '{src}'", ConsoleColor.Red);
+                    hasError = true;
                     continue;
                 }
-                CopyDir(srcPath, destPath, force, verbose);
+                if (!CopyDir(srcPath, destPath, force, verbose)) hasError = true;
             }
             else
             {
-                CopyFile(srcPath, destPath, srcStat, force, verbose);
+                if (!CopyFile(srcPath, destPath, srcStat, force, verbose)) hasError = true;
             }
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static bool CopyFile(string srcPath, string destPath, VfsStat srcStat, bool force, bool verbose)
@@ -161,6 +171,7 @@ public static class Cp
 
         if (entries == null) return true;
 
+        bool allOk = true;
         foreach (var e in entries)
         {
             if (e == null || string.IsNullOrEmpty(e.Name) || e.Name == "." || e.Name == "..") continue;
@@ -172,15 +183,15 @@ public static class Cp
             {
                 if (childStat.IsDirectory)
                 {
-                    CopyDir(childSrc, childDest, force, verbose);
+                    if (!CopyDir(childSrc, childDest, force, verbose)) allOk = false;
                 }
                 else
                 {
-                    CopyFile(childSrc, childDest, childStat, force, verbose);
+                    if (!CopyFile(childSrc, childDest, childStat, force, verbose)) allOk = false;
                 }
             }
         }
-        return true;
+        return allOk;
     }
 
     private static string GetFileName(string path)

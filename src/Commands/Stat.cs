@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Vfs;
 using Novellium.IO;
+using Novellium.Process;
 
 namespace Novellium.Commands;
 
@@ -20,6 +21,7 @@ public static class Stat
             {
                 Output.WriteLine($"stat: invalid option -- '{a}'", ConsoleColor.Red);
                 Output.WriteLine("Try 'stat --help' for more information.", ConsoleColor.Gray);
+                PManager.Exit(pid, 1);
                 return;
             }
             targets.Add(a);
@@ -29,15 +31,18 @@ public static class Stat
         {
             Output.WriteLine("usage: stat [OPTION]... FILE...", ConsoleColor.Yellow);
             Output.WriteLine("Try 'stat --help' for more information.", ConsoleColor.Gray);
+            PManager.Exit(pid, 1);
             return;
         }
 
+        bool hasError = false;
         foreach (string target in targets)
         {
             string path = CManager.ResolvePath(target);
             if (!VfsManager.TryStat(path, out VfsStat st))
             {
                 Output.WriteLine($"stat: cannot stat '{target}': No such file or directory", ConsoleColor.Red);
+                hasError = true;
                 continue;
             }
 
@@ -53,6 +58,8 @@ public static class Stat
             Output.WriteLine($"Modify: {st.Mtime.TvSec} (epoch)", ConsoleColor.DarkGray);
             Output.WriteLine($"Change: {st.Ctime.TvSec} (epoch)", ConsoleColor.DarkGray);
         }
+
+        if (hasError) PManager.Exit(pid, 1);
     }
 
     public static void Help()
